@@ -11,7 +11,7 @@ inputs:
     description: GitHub token used to read pull request review state.
     required: true
   pull-request:
-    description: Pull request number. Inferred from pull request and issue events when omitted.
+    description: Numeric pull request number. Inferred from pull request and issue events when omitted.
     required: false
     default: ''
   codex-bot-logins:

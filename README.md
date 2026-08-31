@@ -6,48 +6,25 @@
   </a>
 </p>
 
-Codex Review Check is a read-only, credit-aware GitHub Action that waits for Codex to review the current pull request HEAD, blocks unresolved Codex review threads, and gives coding agents an explicit `@codex review` command when no review started. The workflow job is named `Codex Review`, so that is the check name to require in a ruleset.
+Codex Review Check is a read-only, credit-aware GitHub Action that guides agents through the Codex review loop: it surfaces known findings first and provides an explicit command when the current HEAD needs another review.
 
 ## Installation
 
-Publish this repository, then pin the Action to a reviewed full commit SHA in the consuming repository. Copy [`examples/codex-review-check.yml`](examples/codex-review-check.yml) to `.github/workflows/codex-review-check.yml` and replace:
+Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
 
-```yaml
-uses: kkkiio/codex-review-check@COMMIT_SHA
-```
+Enable Codex code review for the repository with the **On pull request** trigger so each pull request receives an initial review. The Action provides an explicit command when a later HEAD needs another review.
 
-The workflow needs only read permissions:
-
-```yaml
-permissions:
-  contents: read
-  issues: read
-  pull-requests: read
-```
-
-After the workflow has run on a pull request, add `Codex Review` as a required check in the repository ruleset.
+After its first pull request run, add the `Codex Review` job as a required check in the repository ruleset.
 
 ## Usage
 
-The minimal job is:
+Open or update a pull request, then watch the normal check interface:
 
-```yaml
-jobs:
-  codex-review:
-    name: Codex Review
-    runs-on: ubuntu-latest
-    timeout-minutes: 35
-    steps:
-      - uses: kkkiio/codex-review-check@COMMIT_SHA
-        with:
-          github-token: ${{ github.token }}
+```shell
+gh pr checks --watch
 ```
 
-On pull request and review events, the Action infers the PR number. A manual `workflow_dispatch` run should pass `pull-request` explicitly.
-
-### Agent loop
-
-When `gh pr checks` reports a failure, the run summary gives the agent one concrete next action instead of spending a review credit automatically:
+When `gh pr checks` reports a failure, the run summary gives the agent one concrete next action and keeps review-credit decisions explicit:
 
 <p align="center">
   <a href="https://github.com/kkkiio/pi-workmap/actions/runs/33390800218">
@@ -65,40 +42,11 @@ The check follows this state model:
 | Terminal current-HEAD signal with no blocking threads | Succeed |
 | Liveness without a terminal result before the review timeout | Fail with rerun instructions |
 
-Blocking conversations take precedence over a missing-review hint, so an agent resolves known findings before spending another review credit. This ordering is recorded in [ADR 0001](docs/adr/0001-resolve-known-findings-before-requesting-review.md). The Action never posts `@codex review`; spending a Codex review credit remains an explicit agent or human decision. A standard GitHub Actions rerun reconstructs state from the live PR and reads its current HEAD, reviews, comments, reactions, and review threads again.
+## Documentation
 
-### Configuration
-
-| Input | Default | Purpose |
-| --- | --- | --- |
-| `pull-request` | inferred | PR number for manual or unusual events |
-| `codex-bot-logins` | Codex connector logins | Accepted review authors |
-| `grace-seconds` | `60` | Wait before the missing-review hint fails |
-| `review-timeout-seconds` | `1800` | Maximum wait after liveness is seen |
-| `poll-interval-seconds` | `10` | GitHub state refresh interval |
-| `terminal-settle-seconds` | `15` | Buffer for review-thread propagation |
-| `outdated-threads` | `block` | `block` unresolved outdated threads, or `ignore` them |
-
-`outdated-threads: block` treats `isOutdated` and `isResolved` independently: an outdated conversation still blocks until it is resolved. Choose `ignore` only when repository policy intentionally treats stale diff conversations as closed.
-
-### Rerun after requesting review
-
-The failure summary prints both commands:
-
-```shell
-gh pr comment 42 --body '@codex review'
-gh run rerun RUN_ID --failed
-```
-
-GitHub reruns preserve the original event SHA, but this Action does not use that SHA as review authority. Every attempt calls GitHub for the PR's live `head.sha`, which is why rerun works after Codex finishes or after review conversations are resolved.
-
-## Signal compatibility
-
-Codex's visible GitHub behavior is documented separately in [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md). Read it before changing parsers or adding a new pass signal. Source references and deliberate differences from related gates are in [`docs/REFERENCES.md`](docs/REFERENCES.md).
-
-## Scope
-
-This repository intentionally does not implement automatic review requests, begin-review handshakes, marker/retry comments, HEAD ancestry attestation, scheduled healing, or custom commit statuses. The required check is the `Codex Review` Actions job itself.
+- [Configuration, outputs, and reruns](docs/CONFIGURATION.md)
+- [Observed Codex GitHub signals](docs/CODEX_GITHUB_SIGNALS.md)
+- [Source references and design differences](docs/REFERENCES.md)
 
 ## License
 
