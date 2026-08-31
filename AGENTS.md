@@ -56,7 +56,6 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 - When changing inputs or outputs, update `action.yml` and `docs/CONFIGURATION.md` together.
 - When changing accepted Codex evidence, update `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`.
 - When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links.
-- When referencing local upstream clones or machine-specific paths, write them only in ignored `AGENTS.local.md`; never commit that file.
 
 ### Runtime and release
 
