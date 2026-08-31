@@ -3,12 +3,6 @@ name: Codex Review Check
 on:
   pull_request:
     types: [opened, reopened, ready_for_review, synchronize]
-  pull_request_review:
-    types: [submitted]
-  pull_request_review_comment:
-    types: [created]
-  issue_comment:
-    types: [created]
   workflow_dispatch:
     inputs:
       pull-request:
@@ -22,18 +16,17 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: codex-review-${{ github.repository }}-${{ inputs['pull-request'] || github.event.pull_request.number || github.event.issue.number }}
+  group: codex-review-${{ github.repository }}-${{ inputs['pull-request'] || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
   codex-review:
-    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
     name: Codex Review
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
       - name: Check Codex review state
-        uses: kkkiio/codex-review-check@f4bc75d1cbe94544107e8ebb163f297d9c398ed7
+        uses: kkkiio/codex-review-check@fc15ee152a04c620346b58d58b128b9ed537e361
         with:
           github-token: ${{ github.token }}
-          pull-request: ${{ inputs['pull-request'] || github.event.pull_request.number || github.event.issue.number }}
+          pull-request: ${{ inputs['pull-request'] || github.event.pull_request.number }}

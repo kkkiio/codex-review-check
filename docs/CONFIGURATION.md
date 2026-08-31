@@ -24,6 +24,21 @@ permissions:
   pull-requests: read
 ```
 
+## Workflow orchestration
+
+Use one polling coordinator for each pull request. The recommended workflow starts for pull request lifecycle events that introduce or activate a HEAD, plus explicit manual dispatch:
+
+```yaml
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  workflow_dispatch:
+```
+
+Do not also subscribe the same workflow to `pull_request_review`, `pull_request_review_comment`, or `issue_comment`. The running Action already polls live reviews, comments, reactions, and threads. A lifecycle event creates a separate workflow run rather than notifying the existing run; with shared `cancel-in-progress` concurrency it replaces the coordinator, and without cancellation it duplicates the check.
+
+Keep `cancel-in-progress: true` for the pull-request concurrency group so a new `synchronize` event replaces work tied to an older HEAD. After a missing-review or unresolved-thread failure, use the standard rerun printed in the job summary.
+
 ## Outdated threads
 
 GitHub exposes `isResolved` and `isOutdated` independently.

@@ -36,6 +36,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 - [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior and accepted lifecycle evidence.
 - [`docs/REFERENCES.md`](docs/REFERENCES.md) — Upstream projects, GitHub documentation, and deliberate design differences.
 - [`docs/adr/0001-resolve-known-findings-before-requesting-review.md`](docs/adr/0001-resolve-known-findings-before-requesting-review.md) — Decision to resolve known findings before suggesting another review.
+- [`docs/adr/0002-use-one-polling-coordinator-per-pull-request.md`](docs/adr/0002-use-one-polling-coordinator-per-pull-request.md) — Decision to let one PR-head run observe the Codex lifecycle without comment-triggered replacement runs.
 
 ## Domain Language
 
