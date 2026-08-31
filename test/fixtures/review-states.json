@@ -1,0 +1,91 @@
+{
+  "base": {
+    "repository": "example/project",
+    "pullRequest": 42,
+    "pullRequestUrl": "https://github.com/example/project/pull/42",
+    "headSha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "headCommittedAt": "2026-08-31T10:00:00Z",
+    "reviews": [],
+    "reactions": [],
+    "issueComments": [],
+    "threads": []
+  },
+  "eyes": {
+    "author": "chatgpt-codex-connector[bot]",
+    "content": "eyes",
+    "createdAt": "2026-08-31T10:00:05Z"
+  },
+  "staleEyes": {
+    "author": "chatgpt-codex-connector",
+    "content": "eyes",
+    "createdAt": "2026-08-31T09:59:59Z"
+  },
+  "cleanComment": {
+    "author": "chatgpt-codex-connector",
+    "authorType": "Bot",
+    "appSlug": "chatgpt-codex-connector",
+    "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `aaaaaaaaaa`",
+    "createdAt": "2026-08-31T10:01:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-1"
+  },
+  "mismatchedCleanComment": {
+    "author": "chatgpt-codex-connector",
+    "authorType": "Bot",
+    "appSlug": "chatgpt-codex-connector",
+    "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `bbbbbbbbbb`",
+    "createdAt": "2026-08-31T10:01:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-2"
+  },
+  "progressComment": {
+    "author": "chatgpt-codex-connector",
+    "authorType": "Bot",
+    "appSlug": "chatgpt-codex-connector",
+    "body": "👀 Codex Review still in progress: analyzing tests",
+    "createdAt": "2026-08-31T10:00:10Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-3"
+  },
+  "terminalReview": {
+    "author": "chatgpt-codex-connector",
+    "state": "COMMENTED",
+    "commitId": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "submittedAt": "2026-08-31T10:02:00Z",
+    "url": "https://github.com/example/project/pull/42#pullrequestreview-1"
+  },
+  "oldReview": {
+    "author": "chatgpt-codex-connector",
+    "state": "COMMENTED",
+    "commitId": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    "submittedAt": "2026-08-31T09:50:00Z",
+    "url": "https://github.com/example/project/pull/42#pullrequestreview-0"
+  },
+  "unresolvedThread": {
+    "id": "PRRT_1",
+    "isResolved": false,
+    "isOutdated": false,
+    "path": "src/example.ts",
+    "line": 17,
+    "comments": [
+      {
+        "author": "chatgpt-codex-connector",
+        "body": "[P1] Handle the failure path",
+        "createdAt": "2026-08-31T10:01:30Z",
+        "url": "https://github.com/example/project/pull/42#discussion_r1"
+      }
+    ]
+  },
+  "outdatedThread": {
+    "id": "PRRT_2",
+    "isResolved": false,
+    "isOutdated": true,
+    "path": "src/old.ts",
+    "line": 9,
+    "comments": [
+      {
+        "author": "chatgpt-codex-connector[bot]",
+        "body": "[P2] Old diff finding",
+        "createdAt": "2026-08-31T09:50:00Z",
+        "url": "https://github.com/example/project/pull/42#discussion_r2"
+      }
+    ]
+  }
+}

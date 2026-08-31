@@ -1,0 +1,58 @@
+name: Codex Review Check
+description: Wait for a current-head Codex review and block unresolved Codex review threads without requesting a review automatically.
+author: xieziheng
+
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  github-token:
+    description: GitHub token used to read pull request review state.
+    required: true
+  pull-request:
+    description: Pull request number. Inferred from pull request and issue events when omitted.
+    required: false
+    default: ''
+  codex-bot-logins:
+    description: Comma-separated GitHub logins accepted as Codex review authors.
+    required: false
+    default: chatgpt-codex-connector,chatgpt-codex-connector[bot]
+  grace-seconds:
+    description: Seconds to wait for a current-head Codex lifecycle signal before failing with a review hint.
+    required: false
+    default: '60'
+  review-timeout-seconds:
+    description: Maximum seconds to wait after Codex review liveness is observed.
+    required: false
+    default: '1800'
+  poll-interval-seconds:
+    description: Seconds between GitHub state reads while waiting.
+    required: false
+    default: '10'
+  terminal-settle-seconds:
+    description: Seconds to let review threads propagate after a terminal review signal appears.
+    required: false
+    default: '15'
+  outdated-threads:
+    description: Whether unresolved outdated Codex threads block. Accepted values are block and ignore.
+    required: false
+    default: block
+
+outputs:
+  state:
+    description: 'Final state reported by the action: success or failure.'
+  reason:
+    description: Machine-readable final reason.
+  head-sha:
+    description: Current pull request HEAD read from GitHub during this run.
+  review-signal:
+    description: Current-head Codex review signal selected by the action.
+  unresolved-count:
+    description: Number of unresolved Codex review threads under the configured outdated policy.
+  review-hint:
+    description: gh command that requests Codex review. Populated only when the current HEAD has no review signal.
+
+runs:
+  using: node24
+  main: dist/index.js

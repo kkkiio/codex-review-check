@@ -1,0 +1,39 @@
+name: Codex Review Check
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+  pull_request_review:
+    types: [submitted]
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      pull-request:
+        description: Pull request number to recheck
+        required: true
+        type: number
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+concurrency:
+  group: codex-review-${{ github.repository }}-${{ inputs['pull-request'] || github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  codex-review:
+    if: github.event_name != 'issue_comment' || github.event.issue.pull_request
+    name: Codex Review
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Check Codex review state
+        uses: kkkiio/codex-review-check@COMMIT_SHA
+        with:
+          github-token: ${{ github.token }}
+          pull-request: ${{ inputs['pull-request'] || github.event.pull_request.number || github.event.issue.number }}
