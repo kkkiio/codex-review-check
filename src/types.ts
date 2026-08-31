@@ -21,6 +21,7 @@ export interface IssueCommentRecord {
   body: string;
   createdAt: string | null;
   url: string | null;
+  reactions: ReactionRecord[];
 }
 
 export interface ThreadCommentRecord {

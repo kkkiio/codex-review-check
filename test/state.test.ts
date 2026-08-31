@@ -20,6 +20,8 @@ interface Fixtures {
   cleanComment: IssueCommentRecord;
   mismatchedCleanComment: IssueCommentRecord;
   progressComment: IssueCommentRecord;
+  reviewRequestComment: IssueCommentRecord;
+  completedReviewRequestComment: IssueCommentRecord;
   terminalReview: ReviewRecord;
   oldReview: ReviewRecord;
   unresolvedThread: ReviewThreadRecord;
@@ -99,6 +101,14 @@ test("review state follows current-head, liveness, terminal, thread, and outdate
   assert.equal(progress.phase, "reviewing");
   assert.equal(progress.signal, "progress-comment");
 
+  const requestCommentReviewing = evaluateReviewState(
+    { ...fixtures.base, issueComments: [fixtures.reviewRequestComment] },
+    bots,
+    "block",
+  );
+  assert.equal(requestCommentReviewing.phase, "reviewing");
+  assert.equal(requestCommentReviewing.signal, "eyes");
+
   const staleTerminal = evaluateReviewState(
     { ...fixtures.base, reviews: [fixtures.oldReview] },
     bots,
@@ -128,6 +138,14 @@ test("review state follows current-head, liveness, terminal, thread, and outdate
   );
   assert.equal(cleanReaction.phase, "terminal");
   assert.equal(cleanReaction.signal, "clean-reaction");
+
+  const requestCommentClean = evaluateReviewState(
+    { ...fixtures.base, issueComments: [fixtures.completedReviewRequestComment] },
+    bots,
+    "block",
+  );
+  assert.equal(requestCommentClean.phase, "terminal");
+  assert.equal(requestCommentClean.signal, "clean-reaction");
 
   const blocked = evaluateReviewState(
     {

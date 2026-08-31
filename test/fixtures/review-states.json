@@ -36,7 +36,8 @@
     "appSlug": "chatgpt-codex-connector",
     "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `aaaaaaaaaa`",
     "createdAt": "2026-08-31T10:01:00Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-1"
+    "url": "https://github.com/example/project/pull/42#issuecomment-1",
+    "reactions": []
   },
   "mismatchedCleanComment": {
     "author": "chatgpt-codex-connector",
@@ -44,7 +45,8 @@
     "appSlug": "chatgpt-codex-connector",
     "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `bbbbbbbbbb`",
     "createdAt": "2026-08-31T10:01:00Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-2"
+    "url": "https://github.com/example/project/pull/42#issuecomment-2",
+    "reactions": []
   },
   "progressComment": {
     "author": "chatgpt-codex-connector",
@@ -52,7 +54,38 @@
     "appSlug": "chatgpt-codex-connector",
     "body": "👀 Codex Review still in progress: analyzing tests",
     "createdAt": "2026-08-31T10:00:10Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-3"
+    "url": "https://github.com/example/project/pull/42#issuecomment-3",
+    "reactions": []
+  },
+  "reviewRequestComment": {
+    "author": "example-maintainer",
+    "authorType": "User",
+    "appSlug": null,
+    "body": "@codex review",
+    "createdAt": "2026-08-31T10:00:05Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-4",
+    "reactions": [
+      {
+        "author": "chatgpt-codex-connector[bot]",
+        "content": "eyes",
+        "createdAt": "2026-08-31T10:00:10Z"
+      }
+    ]
+  },
+  "completedReviewRequestComment": {
+    "author": "example-maintainer",
+    "authorType": "User",
+    "appSlug": null,
+    "body": "@codex review",
+    "createdAt": "2026-08-31T10:00:05Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-5",
+    "reactions": [
+      {
+        "author": "chatgpt-codex-connector[bot]",
+        "content": "+1",
+        "createdAt": "2026-08-31T10:03:00Z"
+      }
+    ]
   },
   "terminalReview": {
     "author": "chatgpt-codex-connector",

@@ -65,6 +65,10 @@ export function evaluateReviewState(
   const headCommittedAt = snapshot.headCommittedAt
     ? Date.parse(snapshot.headCommittedAt)
     : Number.NEGATIVE_INFINITY;
+  const observedReactions = [
+    ...snapshot.reactions,
+    ...snapshot.issueComments.flatMap((comment) => comment.reactions),
+  ];
 
   const currentHeadReview = snapshot.reviews.find((review) => {
     const terminalStates = new Set(["COMMENTED", "APPROVED", "CHANGES_REQUESTED"]);
@@ -84,7 +88,7 @@ export function evaluateReviewState(
       (signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef))
     );
   });
-  const freshCleanReaction = snapshot.reactions.find((reaction) => {
+  const freshCleanReaction = observedReactions.find((reaction) => {
     if (
       !normalizedBots.has(reaction.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
       !new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase())
@@ -125,7 +129,7 @@ export function evaluateReviewState(
     const createdAt = comment.createdAt ? Date.parse(comment.createdAt) : Number.NEGATIVE_INFINITY;
     return createdAt >= headCommittedAt;
   });
-  const eyesReaction = snapshot.reactions.find((reaction) => {
+  const eyesReaction = observedReactions.find((reaction) => {
     if (
       !normalizedBots.has(reaction.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
       reaction.content.toLowerCase() !== "eyes"

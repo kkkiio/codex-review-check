@@ -16,7 +16,7 @@ The first layer is comparatively stable. The second can change without this repo
 
 | Stage | Observable GitHub artifact | Interpretation here |
 | --- | --- | --- |
-| Review requested or picked up | 👀 reaction from a configured Codex login | Liveness only; never passes |
+| Review requested or picked up | 👀 reaction from a configured Codex login on the PR body or an `@codex review` comment | Liveness only; never passes |
 | Review running | A one-line `Codex Review in progress` or `Codex Review still in progress` issue comment, with the currently observed optional punctuation/metadata | Liveness only; never passes |
 | Review completed with review output | Submitted PR review by Codex whose REST `commit_id` equals the current PR `head.sha` | Terminal current-HEAD signal |
 | Review completed cleanly | Codex issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one 10- or 40-hex `Reviewed commit` marker matching the current HEAD | Terminal current-HEAD signal |
@@ -29,7 +29,7 @@ OpenAI's public product description documents that a pull request can explicitly
 
 Terminal PR reviews bind strongly through an exact 40-hex `commit_id == pull_request.head.sha` comparison. Clean issue comments bind through their single `Reviewed commit` marker: a 40-hex value must equal HEAD, while a 10-hex value must be its prefix.
 
-The 👀 and `+1` reactions have no commit field. The Action accepts either only when `created_at` is not earlier than the current HEAD commit timestamp. 👀 is liveness-only; a fresh `+1` is the observed clean terminal transition. Timestamp comparison is weaker than `commit_id`, but it rejects a reaction created before the current HEAD and matches the connector behavior observed on a real PR.
+The 👀 and `+1` reactions have no commit field. The Action reads PR-body reactions and reactions attached to `@codex review` issue comments, accepting either only when `created_at` is not earlier than the current HEAD commit timestamp. 👀 is liveness-only; a fresh `+1` is the observed clean terminal transition. Timestamp comparison is weaker than `commit_id`, but it rejects a reaction created before the current HEAD and matches the connector behavior observed on a real PR.
 
 An old review, a clean marker for a different commit, or an old 👀 does not satisfy current-head semantics.
 
@@ -49,6 +49,7 @@ The connector currently removes 👀 and creates a new PR-level `+1` when a revi
 ## Observation log
 
 - 2026-08-31, [`kkkiio/pi-workmap#5`](https://github.com/kkkiio/pi-workmap/pull/5): Codex auto-review first created 👀, then replaced it with a fresh `+1`; it did not create a submitted review or clean issue comment. This live observation added `clean-reaction` support and corresponding stale/fresh fixtures.
+- 2026-08-31, the explicit `@codex review` follow-up on the same PR: Codex attached 👀 to the request comment rather than the PR body. This added paginated request-comment reaction reads and fixture coverage.
 
 ## Review-thread policy
 
