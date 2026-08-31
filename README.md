@@ -1,5 +1,11 @@
 # Codex Review Check
 
+<p align="center">
+  <a href="https://github.com/kkkiio/pi-workmap/actions/runs/33389146297">
+    <img src="assets/codex-review-check.jpg" alt="A successful Codex Review Check workflow on GitHub Actions" width="930">
+  </a>
+</p>
+
 Codex Review Check is a read-only, credit-aware GitHub Action that waits for Codex to review the current pull request HEAD, blocks unresolved Codex review threads, and gives coding agents an explicit `@codex review` command when no review started. The workflow job is named `Codex Review`, so that is the check name to require in a ruleset.
 
 ## Installation
