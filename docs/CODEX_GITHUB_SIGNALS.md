@@ -20,6 +20,7 @@ The first layer is comparatively stable. The second can change without this repo
 | Review running | A one-line `Codex Review in progress` or `Codex Review still in progress` issue comment, with the currently observed optional punctuation/metadata | Liveness only; never passes |
 | Review completed with review output | Submitted PR review by Codex whose REST `commit_id` equals the current PR `head.sha` | Terminal current-HEAD signal |
 | Review completed cleanly | Codex issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one 10- or 40-hex `Reviewed commit` marker matching the current HEAD | Terminal current-HEAD signal |
+| Review completed cleanly through reaction | Codex replaces 👀 with a fresh `+1` reaction | Terminal only when its `created_at` is not earlier than the current HEAD commit timestamp |
 | Finding conversation | GraphQL review thread containing a comment from a configured Codex login | Blocks when unresolved under the outdated policy |
 
 OpenAI's public product description documents that a pull request can explicitly request review with `@codex review`. It does not document the reaction payload, exact progress sentence, clean-comment grammar, or promise those presentation details as a stable API. Treat those formats as compatibility observations.
@@ -28,7 +29,7 @@ OpenAI's public product description documents that a pull request can explicitly
 
 Terminal PR reviews bind strongly through an exact 40-hex `commit_id == pull_request.head.sha` comparison. Clean issue comments bind through their single `Reviewed commit` marker: a 40-hex value must equal HEAD, while a 10-hex value must be its prefix.
 
-The 👀 reaction has no commit field. For liveness only, the Action accepts a configured Codex 👀 whose `created_at` is not earlier than the current HEAD commit timestamp. This is intentionally not sufficient for success: a reaction timestamp cannot prove which pushed PR state Codex inspected.
+The 👀 and `+1` reactions have no commit field. The Action accepts either only when `created_at` is not earlier than the current HEAD commit timestamp. 👀 is liveness-only; a fresh `+1` is the observed clean terminal transition. Timestamp comparison is weaker than `commit_id`, but it rejects a reaction created before the current HEAD and matches the connector behavior observed on a real PR.
 
 An old review, a clean marker for a different commit, or an old 👀 does not satisfy current-head semantics.
 
@@ -43,7 +44,11 @@ The clean-comment parser is narrower than general natural-language matching:
 - exactly one `**Reviewed commit:** \`<10-or-40-hex>\`` line must exist;
 - the marker must match current HEAD.
 
-The parser does not use a PR-level `+1` reaction as terminal evidence. GitHub issue reactions are not commit-bound and one actor cannot create a fresh identical reaction for every HEAD. A thumbs-up can be useful to a human, but it is not authoritative enough for this Action's retained current-head policy.
+The connector currently removes 👀 and creates a new PR-level `+1` when a review finishes cleanly without a submitted review. The Action accepts only a fresh reaction relative to the current HEAD timestamp. An older persistent thumbs-up cannot satisfy a later HEAD. Because reactions are not commit-bound, submitted review `commit_id` and clean-comment `Reviewed commit` remain stronger evidence.
+
+## Observation log
+
+- 2026-08-31, [`kkkiio/pi-workmap#5`](https://github.com/kkkiio/pi-workmap/pull/5): Codex auto-review first created 👀, then replaced it with a fresh `+1`; it did not create a submitted review or clean issue comment. This live observation added `clean-reaction` support and corresponding stale/fresh fixtures.
 
 ## Review-thread policy
 
@@ -62,7 +67,7 @@ Thread and nested thread-comment connections are fully paginated before a decisi
 | Connector login changes | Review looks missing; grace ends with hint | Add the verified login through `codex-bot-logins` and a fixture |
 | 👀 is replaced with another liveness artifact | Job may fail after grace while review is actually running | Add only a liveness parser; do not make it a pass signal |
 | Progress sentence changes | Same as missing liveness | Capture a real payload, update fixture and parser |
-| Clean heading or reviewed-commit marker changes | Clean review does not pass | Verify new artifact is commit-bound before accepting it |
+| Clean heading, reviewed-commit marker, or reaction transition changes | Clean review does not pass | Capture the transition and preserve a current-HEAD freshness check |
 | GitHub review state delivery changes | Terminal signal arrives late | Adjust settle/poll timing, not current-head authority |
 | Codex findings stop using review threads | Existing unresolved-thread policy no longer covers all findings | Design a new explicit finding model; do not infer clean from absence |
 
@@ -88,7 +93,7 @@ The following do not make this Action pass:
 - the workflow's original `GITHUB_SHA`;
 - a prior-HEAD Codex review;
 - a human review or human-authored thread;
-- a bare thumbs-up reaction;
+- a thumbs-up reaction created before the current HEAD;
 - 👀 by itself;
 - thread `isOutdated: true` when the configured policy is `block`;
 - old commit statuses, marker comments, retry counters, or scheduled reconciler state.

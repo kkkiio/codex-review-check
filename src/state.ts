@@ -84,6 +84,16 @@ export function evaluateReviewState(
       (signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef))
     );
   });
+  const freshCleanReaction = snapshot.reactions.find((reaction) => {
+    if (
+      !normalizedBots.has(reaction.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
+      !new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase())
+    ) {
+      return false;
+    }
+    const createdAt = reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY;
+    return createdAt >= headCommittedAt;
+  });
 
   const unresolvedThreads = snapshot.threads.filter((thread) => {
     if (thread.isResolved || (outdatedPolicy === "ignore" && thread.isOutdated)) {
@@ -93,10 +103,14 @@ export function evaluateReviewState(
       normalizedBots.has(comment.author.trim().toLowerCase().replace(/\[bot\]$/u, "")),
     );
   });
-  if (currentHeadReview || currentHeadCleanComment) {
+  if (currentHeadReview || currentHeadCleanComment || freshCleanReaction) {
     return {
       phase: "terminal",
-      signal: currentHeadReview ? `review:${currentHeadReview.state.toLowerCase()}` : "clean-comment",
+      signal: currentHeadReview
+        ? `review:${currentHeadReview.state.toLowerCase()}`
+        : currentHeadCleanComment
+          ? "clean-comment"
+          : "clean-reaction",
       unresolvedThreads,
     };
   }

@@ -48,7 +48,7 @@ The current observed details—connector login, 👀 liveness, progress comment,
 | Missing current-head signal | Pending, then configured timeout/scheduled healing | Marker orchestration and pending/retry | Short grace, then failure with review hint |
 | Sends `@codex review` | No | Yes, controlled marker | No |
 | 👀 | Not primary pass evidence | Liveness only | Liveness only |
-| Clean `+1` | May pass with grace fallback | Audit only | Ignored |
+| Clean `+1` | May pass with grace fallback | Audit only | Passes only when created no earlier than current HEAD |
 | Current-head terminal review | Yes | Yes, strict attestation | Yes, exact REST `commit_id` |
 | Unresolved outdated thread | Ignored by ready default | Blocks exact joined finding until resolved | Blocks by default; `ignore` is configurable |
 | Thread resolution recovery | Polling plus schedule | Event/manual/schedule reconciliation | Standard Actions rerun |

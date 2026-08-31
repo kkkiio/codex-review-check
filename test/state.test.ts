@@ -15,6 +15,8 @@ interface Fixtures {
   base: ReviewSnapshot;
   eyes: ReactionRecord;
   staleEyes: ReactionRecord;
+  cleanReaction: ReactionRecord;
+  staleCleanReaction: ReactionRecord;
   cleanComment: IssueCommentRecord;
   mismatchedCleanComment: IssueCommentRecord;
   progressComment: IssueCommentRecord;
@@ -74,6 +76,13 @@ test("review state follows current-head, liveness, terminal, thread, and outdate
   );
   assert.equal(staleEyes.phase, "missing");
 
+  const staleCleanReaction = evaluateReviewState(
+    { ...fixtures.base, reactions: [fixtures.staleCleanReaction] },
+    bots,
+    "block",
+  );
+  assert.equal(staleCleanReaction.phase, "missing");
+
   const reviewing = evaluateReviewState(
     { ...fixtures.base, reactions: [fixtures.eyes] },
     bots,
@@ -111,6 +120,14 @@ test("review state follows current-head, liveness, terminal, thread, and outdate
   );
   assert.equal(clean.phase, "terminal");
   assert.equal(clean.signal, "clean-comment");
+
+  const cleanReaction = evaluateReviewState(
+    { ...fixtures.base, reactions: [fixtures.cleanReaction] },
+    bots,
+    "block",
+  );
+  assert.equal(cleanReaction.phase, "terminal");
+  assert.equal(cleanReaction.signal, "clean-reaction");
 
   const blocked = evaluateReviewState(
     {
