@@ -1,8 +1,8 @@
 # Codex Review Check
 
 <p align="center">
-  <a href="https://github.com/kkkiio/pi-workmap/actions/runs/33389146297">
-    <img src="assets/codex-review-check.jpg" alt="A successful Codex Review Check workflow on GitHub Actions" width="930">
+  <a href="https://github.com/kkkiio/pi-workmap/pull/6">
+    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing Codex Review failure and CI success" width="930">
   </a>
 </p>
 
@@ -45,17 +45,27 @@ jobs:
 
 On pull request and review events, the Action infers the PR number. A manual `workflow_dispatch` run should pass `pull-request` explicitly.
 
+### Agent loop
+
+When `gh pr checks` reports a failure, the run summary gives the agent one concrete next action instead of spending a review credit automatically:
+
+<p align="center">
+  <a href="https://github.com/kkkiio/pi-workmap/actions/runs/33390800218">
+    <img src="assets/review-hint.jpg" alt="GitHub Actions summary with the Codex review request and rerun commands" width="930">
+  </a>
+</p>
+
 The check follows this state model:
 
 | Current PR state | Result |
 | --- | --- |
+| Unresolved Codex review threads that block under the outdated policy | Fail first and link the blocking conversations |
 | No current-HEAD Codex signal during the grace period | Fail with `gh pr comment <PR> --body '@codex review'` and rerun instructions |
 | Current Codex 👀 or progress signal | Keep the job running/pending while polling |
-| Terminal current-HEAD signal plus unresolved Codex threads | Fail and link the blocking conversations |
 | Terminal current-HEAD signal with no blocking threads | Succeed |
 | Liveness without a terminal result before the review timeout | Fail with rerun instructions |
 
-The Action never posts `@codex review`; spending a Codex review credit remains an explicit agent or human decision. A standard GitHub Actions rerun reconstructs state from the live PR and reads its current HEAD, reviews, comments, reactions, and review threads again.
+Blocking conversations take precedence over a missing-review hint, so an agent resolves known findings before spending another review credit. This ordering is recorded in [ADR 0001](docs/adr/0001-resolve-known-findings-before-requesting-review.md). The Action never posts `@codex review`; spending a Codex review credit remains an explicit agent or human decision. A standard GitHub Actions rerun reconstructs state from the live PR and reads its current HEAD, reviews, comments, reactions, and review threads again.
 
 ### Configuration
 
@@ -89,3 +99,7 @@ Codex's visible GitHub behavior is documented separately in [`docs/CODEX_GITHUB_
 ## Scope
 
 This repository intentionally does not implement automatic review requests, begin-review handshakes, marker/retry comments, HEAD ancestry attestation, scheduled healing, or custom commit statuses. The required check is the `Codex Review` Actions job itself.
+
+## License
+
+[Apache License 2.0](LICENSE)

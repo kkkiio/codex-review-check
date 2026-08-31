@@ -2,3 +2,4 @@ node_modules/
 dist-types/
 .DS_Store
 coverage/
+AGENTS.local.md

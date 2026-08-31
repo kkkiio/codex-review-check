@@ -156,9 +156,18 @@ test("review state follows current-head, liveness, terminal, thread, and outdate
     bots,
     "block",
   );
-  assert.equal(blocked.phase, "terminal");
-  assert.equal(blocked.signal, "review:commented");
+  assert.equal(blocked.phase, "blocked");
+  assert.equal(blocked.signal, "unresolved-threads");
   assert.equal(blocked.unresolvedThreads.length, 2);
+
+  const blockedBeforeReview = evaluateReviewState(
+    { ...fixtures.base, reviews: [fixtures.oldReview], threads: [fixtures.unresolvedThread] },
+    bots,
+    "block",
+  );
+  assert.equal(blockedBeforeReview.phase, "blocked");
+  assert.equal(blockedBeforeReview.signal, "unresolved-threads");
+  assert.equal(blockedBeforeReview.unresolvedThreads.length, 1);
 
   const ignoredOutdated = evaluateReviewState(
     {

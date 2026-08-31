@@ -107,6 +107,13 @@ export function evaluateReviewState(
       normalizedBots.has(comment.author.trim().toLowerCase().replace(/\[bot\]$/u, "")),
     );
   });
+  if (unresolvedThreads.length > 0) {
+    return {
+      phase: "blocked",
+      signal: "unresolved-threads",
+      unresolvedThreads,
+    };
+  }
   if (currentHeadReview || currentHeadCleanComment || freshCleanReaction) {
     return {
       phase: "terminal",

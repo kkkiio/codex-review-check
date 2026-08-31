@@ -162,19 +162,19 @@ async function run(): Promise<void> {
       lastPhase = evaluation.phase;
     }
 
-    if (evaluation.phase === "terminal") {
+    if (evaluation.phase === "blocked") {
+      await publishResult(snapshot, evaluation, "failure", "unresolved-threads");
+      core.setFailed(
+        `${evaluation.unresolvedThreads.length} unresolved Codex review thread(s) must be resolved before requesting another review.`,
+      );
+      return;
+    } else if (evaluation.phase === "terminal") {
       terminalSeenAt ??= Date.now();
       const settledSeconds = Math.floor((Date.now() - terminalSeenAt) / 1000);
       if (settledSeconds < config.terminalSettleSeconds) {
         core.info(
           `Terminal signal found; waiting ${config.terminalSettleSeconds - settledSeconds}s for review threads to settle.`,
         );
-      } else if (evaluation.unresolvedThreads.length > 0) {
-        await publishResult(snapshot, evaluation, "failure", "unresolved-threads");
-        core.setFailed(
-          `${evaluation.unresolvedThreads.length} unresolved Codex review thread(s) block the current HEAD.`,
-        );
-        return;
       } else {
         await publishResult(snapshot, evaluation, "success", "ready");
         return;

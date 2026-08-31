@@ -58,7 +58,7 @@ export type IssueCommentSignal =
   | { kind: "none"; name: "none"; commitRef: null };
 
 export interface ReviewEvaluation {
-  phase: "terminal" | "reviewing" | "missing";
+  phase: "blocked" | "terminal" | "reviewing" | "missing";
   signal: string;
   unresolvedThreads: ReviewThreadRecord[];
 }
