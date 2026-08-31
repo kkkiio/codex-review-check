@@ -31,6 +31,12 @@
 
 Keep GitHub transport and pagination in `src/github.ts`, provider interpretation in `src/state.ts`, and polling plus user-facing results in `src/index.ts`. Keep compiled release code in `dist/`; consumers do not install dependencies at runtime.
 
+### Documentation Map
+
+- [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior and accepted lifecycle evidence.
+- [`docs/REFERENCES.md`](docs/REFERENCES.md) — Upstream projects, GitHub documentation, and deliberate design differences.
+- [`docs/adr/0001-resolve-known-findings-before-requesting-review.md`](docs/adr/0001-resolve-known-findings-before-requesting-review.md) — Decision to resolve known findings before suggesting another review.
+
 ## Domain Language
 
 - **Current HEAD** — The live commit SHA at the tip of the pull request being evaluated.

@@ -42,11 +42,9 @@ The check follows this state model:
 | Terminal current-HEAD signal with no blocking threads | Succeed |
 | Liveness without a terminal result before the review timeout | Fail with rerun instructions |
 
-## Documentation
+## Configuration
 
-- [Configuration, outputs, and reruns](docs/CONFIGURATION.md)
-- [Observed Codex GitHub signals](docs/CODEX_GITHUB_SIGNALS.md)
-- [Source references and design differences](docs/REFERENCES.md)
+See [configuration, outputs, and reruns](docs/CONFIGURATION.md).
 
 ## License
 
