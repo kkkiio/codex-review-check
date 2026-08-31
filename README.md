@@ -34,13 +34,24 @@ When `gh pr checks` reports a failure, the run summary gives the agent one concr
 
 The check follows this state model:
 
-| Current PR state | Result |
-| --- | --- |
-| Unresolved Codex review threads that block under the outdated policy | Fail first and link the blocking conversations |
-| No current-HEAD Codex signal during the grace period | Fail with `gh pr comment <PR> --body '@codex review'` and rerun instructions |
-| Current Codex 👀 or progress signal | Keep the job running/pending while polling |
-| Terminal current-HEAD signal with no blocking threads | Succeed |
-| Liveness without a terminal result before the review timeout | Fail with rerun instructions |
+```mermaid
+flowchart LR
+    A([Run / rerun]) --> B[1 · Handle known findings]
+
+    B -- unresolved --> C[Fail · resolve conversations]
+    C --> A
+
+    B -- clear --> D[2 · Check current HEAD review]
+
+    D -- "👍 / terminal review" --> E([Pass])
+
+    D -- "👀 / progress" --> F[Pending · wait]
+    F --> D
+
+    D -- "no current-HEAD signal" --> G[Fail · show @codex review hint]
+    G --> H[Request review, then rerun]
+    H --> A
+```
 
 ## Configuration
 
