@@ -8,7 +8,7 @@
 .
 ├── AGENTS.md                    # Repository-wide developer-agent guide
 ├── action.yml                   # Public Action metadata, inputs, outputs, and Node entrypoint
-├── assets/                      # Real screenshots rendered in README.md
+├── assets/                      # README screenshots; regenerate gh-pr-checks.png via assets/gh-pr-checks.sh
 ├── dist/                        # Committed ncc release bundle loaded by GitHub Actions
 ├── docs/
 │   ├── CONFIGURATION.md         # User-facing inputs, outputs, policies, and rerun reference
