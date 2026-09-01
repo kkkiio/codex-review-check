@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/kkkiio/pi-workmap/pull/6">
-    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing Codex Review failure and CI success" width="930">
+    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
   </a>
 </p>
 
@@ -24,13 +24,15 @@ Open or update a pull request, then watch the normal check interface:
 gh pr checks --watch
 ```
 
-When `gh pr checks` reports a failure, the run summary gives the agent one concrete next action and keeps review-credit decisions explicit:
+When `gh pr checks` reports a failure, the failure log line gives the agent one concrete next action and keeps review-credit decisions explicit:
 
-<p align="center">
-  <a href="https://github.com/kkkiio/pi-workmap/actions/runs/33390800218">
-    <img src="assets/review-hint.jpg" alt="GitHub Actions summary with the Codex review request and rerun commands" width="930">
-  </a>
-</p>
+```console
+$ gh run view --log-failed
+...
+##[error]No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0. Run: gh pr comment 42 --body '@codex review' — then re-run: gh run rerun 33499862152 --failed
+```
+
+The job summary mirrors the same guidance in the web UI for human debugging.
 
 The check follows this state model:
 

@@ -1,0 +1,9 @@
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | review:approved |
+
+## Ready
+
+Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.

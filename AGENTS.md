@@ -8,33 +8,35 @@
 .
 ├── AGENTS.md                    # Repository-wide developer-agent guide
 ├── action.yml                   # Public Action metadata, inputs, outputs, and Node entrypoint
-├── assets/                      # Real screenshots rendered in README.md
+├── assets/                      # README screenshots; regenerate gh-pr-checks.png via assets/gh-pr-checks.sh
 ├── dist/                        # Committed ncc release bundle loaded by GitHub Actions
 ├── docs/
 │   ├── CONFIGURATION.md         # User-facing inputs, outputs, policies, and rerun reference
 │   ├── CODEX_GITHUB_SIGNALS.md  # Observed provider behavior and accepted evidence
-│   ├── REFERENCES.md            # Upstream sources and deliberate design differences
+│   ├── research.md              # Upstream sources and deliberate design differences
 │   └── adr/                     # Architecture decisions and their consequences
 ├── examples/
 │   └── codex-review-check.yml   # Complete consumer workflow pinned to an immutable SHA
 ├── src/
 │   ├── github.ts                # Paginated GitHub REST and GraphQL state loading
-│   ├── index.ts                 # Action runtime, polling loop, outputs, and job summary
+│   ├── index.ts                 # Action runtime, polling loop, and outputs
+│   ├── messages.ts              # Agent-facing failure wording and job-summary text
 │   ├── state.ts                 # Pure Codex signal and blocking-state evaluation
 │   └── types.ts                 # Shared runtime records and evaluation types
 ├── test/
-│   ├── fixtures/                # Captured and normalized review-state examples
+│   ├── fixtures/                # Captured review-state examples and pinned message text
+│   ├── messages.test.ts         # Fixture-pinned wording for every failure reason
 │   └── state.test.ts            # Signal, current-HEAD, and thread-policy tests
 ├── package.json                 # Development commands and dependencies
 └── README.md                    # Short user getting-started guide
 ```
 
-Keep GitHub transport and pagination in `src/github.ts`, provider interpretation in `src/state.ts`, and polling plus user-facing results in `src/index.ts`. Keep compiled release code in `dist/`; consumers do not install dependencies at runtime.
+Keep GitHub transport and pagination in `src/github.ts`, provider interpretation in `src/state.ts`, user-facing wording in `src/messages.ts`, and polling plus runtime orchestration in `src/index.ts`. Keep compiled release code in `dist/`; consumers do not install dependencies at runtime.
 
 ### Documentation Map
 
-- [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior and accepted lifecycle evidence.
-- [`docs/REFERENCES.md`](docs/REFERENCES.md) — Upstream projects, GitHub documentation, and deliberate design differences.
+- [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior on GitHub pull requests. Acceptance policy lives in `docs/CONFIGURATION.md`.
+- [`docs/research.md`](docs/research.md) — Upstream projects, product and GitHub documentation, and deliberate design differences.
 - [`docs/adr/0001-resolve-known-findings-before-requesting-review.md`](docs/adr/0001-resolve-known-findings-before-requesting-review.md) — Decision to resolve known findings before suggesting another review.
 - [`docs/adr/0002-use-one-polling-coordinator-per-pull-request.md`](docs/adr/0002-use-one-polling-coordinator-per-pull-request.md) — Decision to let one PR-head run observe the Codex lifecycle without comment-triggered replacement runs.
 
@@ -55,8 +57,9 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 ### Behavior and documentation
 
 - When changing inputs or outputs, update `action.yml` and `docs/CONFIGURATION.md` together.
-- When changing accepted Codex evidence, update `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`.
+- When Codex connector behavior is newly observed or changes, record it in `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`; keep acceptance policy in `docs/CONFIGURATION.md` and out of the behavior record.
 - When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links.
+- Agent-facing wording in `src/messages.ts` is pinned by plain-text fixtures in `test/fixtures/messages/`; regenerate with `npm run fixtures:update` and review the wording diff.
 
 ### Runtime and release
 

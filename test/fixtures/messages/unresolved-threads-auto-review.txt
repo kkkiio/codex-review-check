@@ -1,0 +1,26 @@
+=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
+2 unresolved Codex review thread(s) are blocking (listed above). Next steps: 1) resolve each handled conversation 2) gh run rerun 33499862152 --failed. Codex is expected to review each push automatically; if no review for the current HEAD arrives, check the connector configuration.
+
+=== job log lines (core.info) ===
+Blocking Codex review thread: https://github.com/owner/repo/pull/42#discussion_r1
+Blocking Codex review thread: src/widget.ts (outdated)
+
+=== job summary (web UI only) ===
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | unresolved-threads |
+
+## Blocking Codex review threads
+
+Resolve each handled GitHub review conversation, then re-run this check.
+
+- [docs/adr/0012-glyph-width.md:18](https://github.com/owner/repo/pull/42#discussion_r1)
+- src/widget.ts (outdated)
+
+Codex is expected to review each push automatically, so no manual review request is suggested. If these conversations are already resolved — for example, you resolved them after this run started — just re-run the failed job:
+
+```shell
+gh run rerun 33499862152 --failed
+```

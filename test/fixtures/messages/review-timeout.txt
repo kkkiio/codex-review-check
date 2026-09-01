@@ -1,0 +1,20 @@
+=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
+Codex review did not produce a terminal current-HEAD signal before timeout. Re-run after the review finishes: gh run rerun 33499862152 --failed
+
+=== job log lines (core.info) ===
+(none)
+
+=== job summary (web UI only) ===
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | progress-comment |
+
+## Review still in progress
+
+Codex liveness was observed, but no terminal current-HEAD result arrived before the configured timeout. Re-run the check after the review finishes.
+
+```shell
+gh run rerun 33499862152 --failed
+```

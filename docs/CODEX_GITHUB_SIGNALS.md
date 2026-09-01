@@ -1,100 +1,72 @@
 # Codex review signals on GitHub pull requests
 
-This document records the GitHub evidence that Codex Review Check understands as of 2026-08-31. It exists to make provider behavior drift visible instead of silently changing the gate. It is an observation and compatibility contract for this repository, not an OpenAI API guarantee.
+This document records what the Codex GitHub connector observably does on pull requests, as of 2026-09-01. It exists to make provider behavior drift visible.
 
-## Three layers of evidence
+OpenAI documents the connector's user-facing controls in [Codex code review in GitHub](https://learn.chatgpt.com/codex/third-party/github) (summarized in [the code-review use case](https://learn.chatgpt.com/use-cases/github-code-reviews)): the `@codex review` request, the 👀 acknowledgment reaction, automatic review triggers, a stated focus on P0/P1 findings, and `AGENTS.md` review rules. The progress-sentence grammar, clean-result comment format, `Reviewed commit` marker, and `+1` reaction transition remain undocumented presentation details that can change without notice. Everything beyond the documented controls is an observation, not an OpenAI API guarantee.
 
-The implementation deliberately separates three layers:
+## Two sources of truth
 
-1. GitHub's documented data model: pull request review `commit_id`, GraphQL review-thread `isResolved` and `isOutdated`, author identity, timestamps, and pagination.
-2. Codex's currently observed presentation: connector login, 👀 reaction, progress text, clean-result text, and the `Reviewed commit` marker.
-3. This Action's policy: what may keep a job pending, what may pass it, and what blocks it.
+1. GitHub's documented data model: pull request review `commit_id`, GraphQL review-thread `isResolved` and `isOutdated`, author identity, timestamps, and pagination. Comparatively stable.
+2. Codex's currently observed presentation: connector login, 👀 reaction, progress text, clean-result text, and the `Reviewed commit` marker. Can change without this repository changing.
 
-The first layer is comparatively stable. The second can change without this repository changing. The third must remain explicit and covered by fixtures.
+## Observed lifecycle
 
-## Current observed lifecycle
+| Stage | Observable GitHub artifact |
+| --- | --- |
+| Review requested or picked up | 👀 reaction from the connector login on the PR body or on the `@codex review` comment |
+| Review running | A one-line `Codex Review in progress` or `Codex Review still in progress` issue comment, with the currently observed optional punctuation and metadata |
+| Review completed with review output | Submitted PR review whose REST `commit_id` equals the reviewed commit |
+| Review completed cleanly | Issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one 10- or 40-hex `Reviewed commit` marker naming the reviewed commit |
+| Review completed cleanly through reaction | Connector removes 👀 and creates a fresh `+1` reaction |
+| Finding conversation | GraphQL review thread containing a comment from the connector login |
 
-| Stage | Observable GitHub artifact | Interpretation here |
-| --- | --- | --- |
-| Review requested or picked up | 👀 reaction from a configured Codex login on the PR body or an `@codex review` comment | Liveness only; never passes |
-| Review running | A one-line `Codex Review in progress` or `Codex Review still in progress` issue comment, with the currently observed optional punctuation/metadata | Liveness only; never passes |
-| Review completed with review output | Submitted PR review by Codex whose REST `commit_id` equals the current PR `head.sha` | Terminal current-HEAD signal |
-| Review completed cleanly | Codex issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one 10- or 40-hex `Reviewed commit` marker matching the current HEAD | Terminal current-HEAD signal |
-| Review completed cleanly through reaction | Codex replaces 👀 with a fresh `+1` reaction | Terminal only when its `created_at` is not earlier than the current HEAD commit timestamp |
-| Finding conversation | GraphQL review thread containing a comment from a configured Codex login | Blocks when unresolved under the outdated policy |
+## How artifacts bind to commits
 
-OpenAI's public product description documents that a pull request can explicitly request review with `@codex review`. It does not document the reaction payload, exact progress sentence, clean-comment grammar, or promise those presentation details as a stable API. Treat those formats as compatibility observations.
+- Submitted reviews bind strongly: `commit_id` is the exact 40-hex reviewed commit.
+- Clean comments bind through their single `Reviewed commit` marker: a 40-hex value names the full commit, while a 10-hex value is its prefix.
+- 👀 and `+1` reactions carry no commit field. The only freshness information is `created_at`, comparable against a HEAD commit timestamp — weaker than `commit_id`, matching the connector behavior observed on real pull requests.
 
-## Current-HEAD binding
+An artifact attesting an older commit says nothing about any later HEAD. Whether such stale evidence satisfies a gate is a consumer's policy choice, not a property of the artifact.
 
-Terminal PR reviews bind strongly through an exact 40-hex `commit_id == pull_request.head.sha` comparison. Clean issue comments bind through their single `Reviewed commit` marker: a 40-hex value must equal HEAD, while a 10-hex value must be its prefix.
+## Review-thread data model
 
-The 👀 and `+1` reactions have no commit field. The Action reads PR-body reactions and reactions attached to `@codex review` issue comments, accepting either only when `created_at` is not earlier than the current HEAD commit timestamp. 👀 is liveness-only; a fresh `+1` is the observed clean terminal transition. Timestamp comparison is weaker than `commit_id`, but it rejects a reaction created before the current HEAD and matches the connector behavior observed on a real PR.
+GitHub exposes `isResolved` and `isOutdated` as separate booleans. They are not synonyms: a thread can be outdated but unresolved, resolved but not outdated, and so on. Thread and nested thread-comment connections are paginated.
 
-An old review, a clean marker for a different commit, or an old 👀 does not satisfy current-head semantics.
+## Artifacts that are not review outcomes
 
-## Terminal and clean signals
+Observed or plausible artifacts that carry no review verdict for the current HEAD:
 
-Accepted submitted review states are `COMMENTED`, `APPROVED`, and `CHANGES_REQUESTED`. `PENDING` and `DISMISSED` are not terminal evidence. The Action waits a short settle interval after first seeing a terminal signal, then reads the complete state again so that newly created review threads have time to appear.
+- the workflow's original `GITHUB_SHA`;
+- a review whose `commit_id` names a prior HEAD;
+- a human review or human-authored thread;
+- a thumbs-up reaction created before the current HEAD commit;
+- 👀 by itself — it marks activity, not an outcome;
+- old commit statuses, marker comments, retry counters, or scheduled reconciler state.
 
-The clean-comment parser is narrower than general natural-language matching:
+## Drift risks
 
-- the first heading must visibly begin with `Codex Review` after only Markdown heading syntax or emoji-like decoration;
-- the clean lead must be `Codex Review: Didn't find any major issues.`;
-- exactly one `**Reviewed commit:** \`<10-or-40-hex>\`` line must exist;
-- the marker must match current HEAD.
+| Possible provider change | Observable symptom |
+| --- | --- |
+| Connector login changes | Reviews and comments arrive from an unknown author |
+| 👀 is replaced with another liveness artifact | A running review shows no 👀 |
+| Progress sentence changes | The progress comment no longer matches the observed grammar |
+| Clean heading, reviewed-commit marker, or reaction transition changes | A clean review produces no recognizable terminal artifact |
+| GitHub review state delivery changes | Terminal artifacts arrive late |
+| Codex findings stop using review threads | Findings appear without review threads |
 
-The connector currently removes 👀 and creates a new PR-level `+1` when a review finishes cleanly without a submitted review. The Action accepts only a fresh reaction relative to the current HEAD timestamp. An older persistent thumbs-up cannot satisfy a later HEAD. Because reactions are not commit-bound, submitted review `commit_id` and clean-comment `Reviewed commit` remain stronger evidence.
+## Adding or correcting an observation
+
+1. Capture the relevant artifact from a real pull request through GitHub REST or GraphQL without editing the PR.
+2. Remove repository-sensitive prose and identifiers while retaining field names, author type, timestamps, commit binding, and structural text.
+3. Add or update a case in [`../test/fixtures/review-states.json`](../test/fixtures/review-states.json).
+4. Run `npm run check` and inspect the bundled `dist/index.js` change.
+5. Update the observation log and this document if the provider behavior changed materially.
+
+Useful read-only inspection surfaces are the REST pull request reviews, issue reactions, issue comments, and the GraphQL `reviewThreads` connection. Prefer raw payloads over screenshots because the UI may combine several artifacts.
 
 ## Observation log
 
 - 2026-08-31, [`kkkiio/pi-workmap#5`](https://github.com/kkkiio/pi-workmap/pull/5): Codex auto-review first created 👀, then replaced it with a fresh `+1`; it did not create a submitted review or clean issue comment. This live observation added `clean-reaction` support and corresponding stale/fresh fixtures.
 - 2026-08-31, the explicit `@codex review` follow-up on the same PR: Codex attached 👀 to the request comment rather than the PR body. This added paginated request-comment reaction reads and fixture coverage.
-
-## Review-thread policy
-
-GitHub exposes `isResolved` and `isOutdated` as separate booleans. They are not synonyms.
-
-- `outdated-threads: block` (default): every unresolved thread containing a configured Codex comment blocks, including `isOutdated: true` threads.
-- `outdated-threads: ignore`: unresolved outdated threads are omitted; unresolved non-outdated threads still block.
-- A resolved thread never blocks.
-
-Thread and nested thread-comment connections are fully paginated before a decision. The Action does not assume that the first 100 threads or first 100 comments contain all Codex evidence.
-
-## Drift risks and expected failure mode
-
-| Possible provider change | Expected symptom | Safe repository response |
-| --- | --- | --- |
-| Connector login changes | Review looks missing; grace ends with hint | Add the verified login through `codex-bot-logins` and a fixture |
-| 👀 is replaced with another liveness artifact | Job may fail after grace while review is actually running | Add only a liveness parser; do not make it a pass signal |
-| Progress sentence changes | Same as missing liveness | Capture a real payload, update fixture and parser |
-| Clean heading, reviewed-commit marker, or reaction transition changes | Clean review does not pass | Capture the transition and preserve a current-HEAD freshness check |
-| GitHub review state delivery changes | Terminal signal arrives late | Adjust settle/poll timing, not current-head authority |
-| Codex findings stop using review threads | Existing unresolved-thread policy no longer covers all findings | Design a new explicit finding model; do not infer clean from absence |
-
-Unknown presentation fails by absence: it cannot produce success. Depending on whether another known liveness signal exists, the job either keeps waiting or fails with the explicit review hint. GitHub API or pagination failures fail the job rather than returning a clean result.
-
-## Drift verification procedure
-
-Before changing a signal parser:
-
-1. Capture the relevant artifact from a real test PR through GitHub REST or GraphQL without editing the PR.
-2. Remove repository-sensitive prose and identifiers while retaining field names, author type, timestamps, commit binding, and structural text.
-3. Add or update a case in [`../test/fixtures/review-states.json`](../test/fixtures/review-states.json).
-4. Add a negative case proving that stale or mismatched-HEAD evidence cannot pass.
-5. Run `npm run check` and inspect the bundled `dist/index.js` change.
-6. Update the observation date and this document if the provider behavior changed materially.
-
-Useful read-only inspection surfaces are the REST pull request reviews, issue reactions, issue comments, and the GraphQL `reviewThreads` connection. Prefer raw payloads over screenshots because the UI may combine several artifacts.
-
-## Non-signals
-
-The following do not make this Action pass:
-
-- the workflow's original `GITHUB_SHA`;
-- a prior-HEAD Codex review;
-- a human review or human-authored thread;
-- a thumbs-up reaction created before the current HEAD;
-- 👀 by itself;
-- thread `isOutdated: true` when the configured policy is `block`;
-- old commit statuses, marker comments, retry counters, or scheduled reconciler state.
+- 2026-09-01, [`kkkiio/codex-review-check#1`](https://github.com/kkkiio/codex-review-check/pull/1): first dogfood run of the log-first failure guidance. The run failed fast on a real unresolved thread and printed the three-step sequence; Codex's review of that PR also flagged that this document had drifted from the action's new `stale-reviews` policy, prompting the split between behavior (here) and policy (CONFIGURATION.md).
+- 2026-09-01, same PR: findings arrived with P2 badges although the product documentation states that Codex flags only P0 and P1 issues in GitHub. Treat badge severities as presentational.

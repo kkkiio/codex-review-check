@@ -14,6 +14,8 @@ Codex Review Check reads live pull request state on every attempt. The complete 
 | `poll-interval-seconds` | no | `10` | Delay between live GitHub state reads |
 | `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence |
 | `outdated-threads` | no | `block` | Either `block` or `ignore` for unresolved outdated threads |
+| `stale-reviews` | no | `block` | Either `block` or `ignore` for terminal review evidence attesting an older HEAD |
+| `review-hint` | no | `suggest` | Either `suggest` or `suppress` the manual `@codex review` request hint |
 
 The workflow token needs only:
 
@@ -37,7 +39,16 @@ on:
 
 Do not also subscribe the same workflow to `pull_request_review`, `pull_request_review_comment`, or `issue_comment`. The running Action already polls live reviews, comments, reactions, and threads. A lifecycle event creates a separate workflow run rather than notifying the existing run; with shared `cancel-in-progress` concurrency it replaces the coordinator, and without cancellation it duplicates the check.
 
-Keep `cancel-in-progress: true` for the pull-request concurrency group so a new `synchronize` event replaces work tied to an older HEAD. After a missing-review or unresolved-thread failure, use the standard rerun printed in the job summary.
+Keep `cancel-in-progress: true` for the pull-request concurrency group so a new `synchronize` event replaces work tied to an older HEAD. After a missing-review or unresolved-thread failure, use the standard rerun printed in the failure log line and the job summary.
+
+## What satisfies the check
+
+The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
+
+- Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
+- A terminal artifact passes it when it attests the current HEAD — or an older one under `stale-reviews: ignore`.
+- Unresolved Codex review threads block under `outdated-threads: block`.
+- Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
 
 ## Outdated threads
 
@@ -46,7 +57,23 @@ GitHub exposes `isResolved` and `isOutdated` independently.
 - `block` keeps every unresolved Codex thread blocking, including `isOutdated: true` threads.
 - `ignore` omits unresolved outdated threads but still blocks unresolved current threads.
 
-Known blocking threads always take precedence over lifecycle state. The Action tells the agent to resolve them before it can emit a missing-review hint.
+Known blocking threads always take precedence over lifecycle state. The failure tells the agent to resolve them first; when the current HEAD also lacks accepted review evidence and `review-hint` is `suggest`, the same failure includes the review request as the step after resolving.
+
+## Stale reviews
+
+A terminal Codex review attests the commit it was submitted against. A push replaces the HEAD, so an older review no longer covers it.
+
+- `block` requires terminal evidence attesting the current HEAD; anything older is treated as no review.
+- `ignore` accepts the most recent terminal review, clean comment, or 👍 reaction even when it attests an older HEAD. Use this only when you are comfortable treating the last Codex verdict as final across pushes.
+
+Unresolved threads block under either setting; thread resolution and review freshness are independent concerns.
+
+## Review hint
+
+The Action never spends Codex credits itself, but its failures can tell the agent to request a review with `gh pr comment <PR> --body '@codex review'`.
+
+- `suggest` presents that command when the current HEAD lacks accepted review evidence and no review of it is in progress. This fits setups where Codex reviews only on pull request open, and setups with no automatic review at all — in both, a manual comment is the only way a later HEAD gets reviewed.
+- `suppress` omits the command. Use it when Codex is configured to review every push: a missing review then means the connector did not fire, and the failure says to verify that instead of requesting a review manually.
 
 ## Pull request selection
 
@@ -63,11 +90,11 @@ The Action infers this number from pull request, review, review-comment, and pul
 | `head-sha` | Live pull request HEAD evaluated by this attempt |
 | `review-signal` | Selected Codex lifecycle or blocking signal |
 | `unresolved-count` | Number of threads that block under the outdated policy |
-| `review-hint` | `gh` review-request command, populated only for a missing review with no known blockers |
+| `review-hint` | `gh` review-request command, populated when the action suggests a manual review request |
 
 ## Reruns
 
-The missing-review summary prints both commands:
+The missing-review failure prints both commands in the job log and the job summary:
 
 ```shell
 gh pr comment 42 --body '@codex review'
