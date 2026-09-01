@@ -1,8 +1,15 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { loadReviewSnapshot } from "./github.js";
+import { failureOutput, reviewRequestCommand, summaryMarkdown } from "./messages.js";
 import { evaluateReviewState } from "./state.js";
-import type { OutdatedPolicy, ReviewEvaluation, ReviewSnapshot } from "./types.js";
+import type {
+  OutdatedPolicy,
+  ReviewEvaluation,
+  ReviewHintPolicy,
+  ReviewSnapshot,
+  StalePolicy,
+} from "./types.js";
 
 interface RuntimeConfig {
   token: string;
@@ -14,6 +21,8 @@ interface RuntimeConfig {
   pollIntervalSeconds: number;
   terminalSettleSeconds: number;
   outdatedPolicy: OutdatedPolicy;
+  stalePolicy: StalePolicy;
+  reviewHintPolicy: ReviewHintPolicy;
 }
 
 async function publishResult(
@@ -21,66 +30,31 @@ async function publishResult(
   evaluation: ReviewEvaluation,
   state: "success" | "failure",
   reason: string,
+  reviewHintPolicy: ReviewHintPolicy,
 ): Promise<void> {
-  const reviewHint = `gh pr comment ${snapshot.pullRequest} --body '@codex review'`;
-  const rerunHint = process.env.GITHUB_RUN_ID
-    ? `gh run rerun ${process.env.GITHUB_RUN_ID} --failed`
-    : "Re-run the failed Codex Review job from GitHub Actions.";
   core.setOutput("state", state);
   core.setOutput("reason", reason);
   core.setOutput("head-sha", snapshot.headSha);
   core.setOutput("review-signal", evaluation.signal);
   core.setOutput("unresolved-count", evaluation.unresolvedThreads.length.toString());
-  core.setOutput("review-hint", reason === "review-missing" ? reviewHint : "");
-
-  core.summary
-    .addHeading("Codex Review", 1)
-    .addTable([
-      [
-        { data: "Pull request", header: true },
-        { data: "HEAD", header: true },
-        { data: "State", header: true },
-        { data: "Signal", header: true },
-      ],
-      [
-        `[${snapshot.repository}#${snapshot.pullRequest}](${snapshot.pullRequestUrl})`,
-        `\`${snapshot.headSha}\``,
-        state,
-        evaluation.signal,
-      ],
-    ]);
-
-  if (reason === "review-missing") {
-    core.summary
-      .addHeading("Agent next action", 2)
-      .addRaw("No Codex review signal was found for the current PR HEAD after the grace period.\n\n")
-      .addRaw("Request one explicitly; this Action will not spend Codex credits for you.\n\n")
-      .addCodeBlock(reviewHint, "shell")
-      .addRaw("Then re-run the failed check:\n\n")
-      .addCodeBlock(rerunHint, "shell");
-  } else if (reason === "unresolved-threads") {
-    core.summary
-      .addHeading("Blocking Codex review threads", 2)
-      .addRaw("Resolve each handled GitHub review conversation, then re-run this check.\n\n");
-    for (const thread of evaluation.unresolvedThreads) {
-      const location = thread.line ? `${thread.path ?? "unknown"}:${thread.line}` : thread.path ?? "unknown";
-      const codexComment = thread.comments.find((comment) => comment.url);
-      const suffix = thread.isOutdated ? " (outdated)" : "";
-      core.summary.addRaw(
-        `- ${codexComment?.url ? `[${location}](${codexComment.url})` : location}${suffix}\n`,
-      );
-    }
-    core.summary.addRaw("\n").addCodeBlock(rerunHint, "shell");
-  } else if (reason === "review-timeout") {
-    core.summary
-      .addHeading("Review still in progress", 2)
-      .addRaw("Codex liveness was observed, but no terminal current-HEAD result arrived before the configured timeout. Re-run the check after the review finishes.\n\n")
-      .addCodeBlock(rerunHint, "shell");
-  } else {
-    core.summary
-      .addHeading("Ready", 2)
-      .addRaw("Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.\n");
-  }
+  const suggestReviewRequest =
+    reviewHintPolicy === "suggest" &&
+    (reason === "review-missing" ||
+      (reason === "unresolved-threads" && !evaluation.currentHeadTerminal));
+  core.setOutput(
+    "review-hint",
+    suggestReviewRequest ? reviewRequestCommand(snapshot.pullRequest) : "",
+  );
+  core.summary.addRaw(
+    summaryMarkdown(
+      snapshot,
+      evaluation,
+      state,
+      reason,
+      process.env.GITHUB_RUN_ID,
+      reviewHintPolicy,
+    ),
+  );
   await core.summary.write();
 }
 
@@ -118,6 +92,14 @@ async function run(): Promise<void> {
   if (outdatedInput !== "block" && outdatedInput !== "ignore") {
     throw new Error("outdated-threads must be exactly block or ignore.");
   }
+  const staleInput = core.getInput("stale-reviews").trim().toLowerCase();
+  if (staleInput !== "block" && staleInput !== "ignore") {
+    throw new Error("stale-reviews must be exactly block or ignore.");
+  }
+  const reviewHintInput = core.getInput("review-hint").trim().toLowerCase();
+  if (reviewHintInput !== "suggest" && reviewHintInput !== "suppress") {
+    throw new Error("review-hint must be exactly suggest or suppress.");
+  }
 
   const config: RuntimeConfig = {
     token,
@@ -132,6 +114,8 @@ async function run(): Promise<void> {
     ),
     ...integerInputs,
     outdatedPolicy: outdatedInput,
+    stalePolicy: staleInput,
+    reviewHintPolicy: reviewHintInput,
   };
   if (config.botLogins.size === 0) {
     throw new Error("codex-bot-logins must contain at least one login.");
@@ -152,7 +136,12 @@ async function run(): Promise<void> {
       lastPhase = "";
       core.info(`Evaluating live pull request HEAD ${observedHeadSha}.`);
     }
-    const evaluation = evaluateReviewState(snapshot, config.botLogins, config.outdatedPolicy);
+    const evaluation = evaluateReviewState(
+      snapshot,
+      config.botLogins,
+      config.outdatedPolicy,
+      config.stalePolicy,
+    );
     const elapsedSeconds = Math.floor((Date.now() - headStartedAt) / 1000);
     livenessSeen ||= evaluation.phase !== "missing";
     if (evaluation.phase !== lastPhase) {
@@ -163,10 +152,24 @@ async function run(): Promise<void> {
     }
 
     if (evaluation.phase === "blocked") {
-      await publishResult(snapshot, evaluation, "failure", "unresolved-threads");
-      core.setFailed(
-        `${evaluation.unresolvedThreads.length} unresolved Codex review thread(s) must be resolved before requesting another review.`,
+      const output = failureOutput(
+        "unresolved-threads",
+        snapshot,
+        evaluation,
+        process.env.GITHUB_RUN_ID,
+        config.reviewHintPolicy,
       );
+      for (const line of output.logLines) {
+        core.info(line);
+      }
+      await publishResult(
+        snapshot,
+        evaluation,
+        "failure",
+        "unresolved-threads",
+        config.reviewHintPolicy,
+      );
+      core.setFailed(output.annotation);
       return;
     } else if (evaluation.phase === "terminal") {
       terminalSeenAt ??= Date.now();
@@ -176,7 +179,7 @@ async function run(): Promise<void> {
           `Terminal signal found; waiting ${config.terminalSettleSeconds - settledSeconds}s for review threads to settle.`,
         );
       } else {
-        await publishResult(snapshot, evaluation, "success", "ready");
+        await publishResult(snapshot, evaluation, "success", "ready", config.reviewHintPolicy);
         return;
       }
     } else {
@@ -184,9 +187,15 @@ async function run(): Promise<void> {
     }
 
     if (evaluation.phase !== "terminal" && !livenessSeen && elapsedSeconds >= config.graceSeconds) {
-      await publishResult(snapshot, evaluation, "failure", "review-missing");
+      await publishResult(snapshot, evaluation, "failure", "review-missing", config.reviewHintPolicy);
       core.setFailed(
-        `No Codex review signal for current HEAD ${snapshot.headSha}. Run: gh pr comment ${snapshot.pullRequest} --body '@codex review'`,
+        failureOutput(
+          "review-missing",
+          snapshot,
+          evaluation,
+          process.env.GITHUB_RUN_ID,
+          config.reviewHintPolicy,
+        ).annotation,
       );
       return;
     }
@@ -195,8 +204,16 @@ async function run(): Promise<void> {
       livenessSeen &&
       elapsedSeconds >= config.reviewTimeoutSeconds
     ) {
-      await publishResult(snapshot, evaluation, "failure", "review-timeout");
-      core.setFailed("Codex review did not produce a terminal current-HEAD signal before timeout.");
+      await publishResult(snapshot, evaluation, "failure", "review-timeout", config.reviewHintPolicy);
+      core.setFailed(
+        failureOutput(
+          "review-timeout",
+          snapshot,
+          evaluation,
+          process.env.GITHUB_RUN_ID,
+          config.reviewHintPolicy,
+        ).annotation,
+      );
       return;
     }
 

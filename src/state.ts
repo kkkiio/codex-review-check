@@ -4,6 +4,7 @@ import type {
   OutdatedPolicy,
   ReviewEvaluation,
   ReviewSnapshot,
+  StalePolicy,
 } from "./types.js";
 
 export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommentSignal {
@@ -57,10 +58,13 @@ export function evaluateReviewState(
   snapshot: ReviewSnapshot,
   botLogins: ReadonlySet<string>,
   outdatedPolicy: OutdatedPolicy,
+  stalePolicy: StalePolicy,
 ): ReviewEvaluation {
   const normalizedBots = new Set(
     [...botLogins].map((login) => login.trim().toLowerCase().replace(/\[bot\]$/u, "")),
   );
+  const isBot = (author: string) =>
+    normalizedBots.has(author.trim().toLowerCase().replace(/\[bot\]$/u, ""));
   const currentHead = snapshot.headSha.toLowerCase();
   const headCommittedAt = snapshot.headCommittedAt
     ? Date.parse(snapshot.headCommittedAt)
@@ -70,77 +74,78 @@ export function evaluateReviewState(
     ...snapshot.issueComments.flatMap((comment) => comment.reactions),
   ];
 
-  const currentHeadReview = snapshot.reviews.find((review) => {
-    const terminalStates = new Set(["COMMENTED", "APPROVED", "CHANGES_REQUESTED"]);
-    return (
-      normalizedBots.has(review.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) &&
-      terminalStates.has(review.state.toUpperCase()) &&
-      review.commitId.toLowerCase() === currentHead
+  const terminalStates = new Set(["COMMENTED", "APPROVED", "CHANGES_REQUESTED"]);
+  const botTerminalReviews = snapshot.reviews.filter(
+    (review) => isBot(review.author) && terminalStates.has(review.state.toUpperCase()),
+  );
+  const terminalReview =
+    stalePolicy === "ignore"
+      ? botTerminalReviews[botTerminalReviews.length - 1]
+      : botTerminalReviews.find((review) => review.commitId.toLowerCase() === currentHead);
+
+  const botCleanSignals = snapshot.issueComments
+    .filter((comment) => isBot(comment.author))
+    .map((comment) => parseCodexIssueComment(comment))
+    .filter(
+      (signal): signal is Extract<IssueCommentSignal, { kind: "terminal" }> =>
+        signal.kind === "terminal",
     );
-  });
-  const currentHeadCleanComment = snapshot.issueComments.find((comment) => {
-    if (!normalizedBots.has(comment.author.trim().toLowerCase().replace(/\[bot\]$/u, ""))) {
+  const cleanSignal =
+    stalePolicy === "ignore"
+      ? botCleanSignals[botCleanSignals.length - 1]
+      : botCleanSignals.find(
+          (signal) => signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef),
+        );
+
+  const cleanReaction = observedReactions.find((reaction) => {
+    if (!isBot(reaction.author) || !new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase())) {
       return false;
     }
-    const signal = parseCodexIssueComment(comment);
-    return (
-      signal.kind === "terminal" &&
-      (signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef))
-    );
-  });
-  const freshCleanReaction = observedReactions.find((reaction) => {
-    if (
-      !normalizedBots.has(reaction.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
-      !new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase())
-    ) {
-      return false;
+    if (stalePolicy === "ignore") {
+      return true;
     }
     const createdAt = reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY;
     return createdAt >= headCommittedAt;
   });
 
+  const currentHeadTerminal = Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
+
   const unresolvedThreads = snapshot.threads.filter((thread) => {
     if (thread.isResolved || (outdatedPolicy === "ignore" && thread.isOutdated)) {
       return false;
     }
-    return thread.comments.some((comment) =>
-      normalizedBots.has(comment.author.trim().toLowerCase().replace(/\[bot\]$/u, "")),
-    );
+    return thread.comments.some((comment) => isBot(comment.author));
   });
   if (unresolvedThreads.length > 0) {
     return {
       phase: "blocked",
       signal: "unresolved-threads",
       unresolvedThreads,
+      currentHeadTerminal,
     };
   }
-  if (currentHeadReview || currentHeadCleanComment || freshCleanReaction) {
+  if (terminalReview || cleanSignal || cleanReaction) {
     return {
       phase: "terminal",
-      signal: currentHeadReview
-        ? `review:${currentHeadReview.state.toLowerCase()}`
-        : currentHeadCleanComment
+      signal: terminalReview
+        ? `review:${terminalReview.state.toLowerCase()}`
+        : cleanSignal
           ? "clean-comment"
           : "clean-reaction",
       unresolvedThreads,
+      currentHeadTerminal: true,
     };
   }
 
   const progressComment = snapshot.issueComments.find((comment) => {
-    if (
-      !normalizedBots.has(comment.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
-      parseCodexIssueComment(comment).kind !== "liveness"
-    ) {
+    if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
       return false;
     }
     const createdAt = comment.createdAt ? Date.parse(comment.createdAt) : Number.NEGATIVE_INFINITY;
     return createdAt >= headCommittedAt;
   });
   const eyesReaction = observedReactions.find((reaction) => {
-    if (
-      !normalizedBots.has(reaction.author.trim().toLowerCase().replace(/\[bot\]$/u, "")) ||
-      reaction.content.toLowerCase() !== "eyes"
-    ) {
+    if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
       return false;
     }
     const createdAt = reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY;
@@ -151,6 +156,7 @@ export function evaluateReviewState(
       phase: "reviewing",
       signal: progressComment ? "progress-comment" : "eyes",
       unresolvedThreads,
+      currentHeadTerminal: false,
     };
   }
 
@@ -158,5 +164,6 @@ export function evaluateReviewState(
     phase: "missing",
     signal: "none",
     unresolvedThreads,
+    currentHeadTerminal: false,
   };
 }

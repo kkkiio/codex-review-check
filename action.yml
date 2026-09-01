@@ -38,6 +38,14 @@ inputs:
     description: Whether unresolved outdated Codex threads block. Accepted values are block and ignore.
     required: false
     default: block
+  stale-reviews:
+    description: Whether terminal Codex review evidence for an older HEAD satisfies the check. Accepted values are block and ignore.
+    required: false
+    default: block
+  review-hint:
+    description: Whether failures suggest the manual gh pr comment review request. Use suppress when Codex reviews every push automatically. Accepted values are suggest and suppress.
+    required: false
+    default: suggest
 
 outputs:
   state:
@@ -51,7 +59,7 @@ outputs:
   unresolved-count:
     description: Number of unresolved Codex review threads under the configured outdated policy.
   review-hint:
-    description: gh command that requests Codex review. Populated only when the current HEAD has no review signal.
+    description: gh command that requests Codex review. Populated when the action suggests a manual review request for the current HEAD.
 
 runs:
   using: node24

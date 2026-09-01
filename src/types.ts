@@ -1,5 +1,9 @@
 export type OutdatedPolicy = "block" | "ignore";
 
+export type StalePolicy = "block" | "ignore";
+
+export type ReviewHintPolicy = "suggest" | "suppress";
+
 export interface ReviewRecord {
   author: string;
   state: string;
@@ -61,4 +65,6 @@ export interface ReviewEvaluation {
   phase: "blocked" | "terminal" | "reviewing" | "missing";
   signal: string;
   unresolvedThreads: ReviewThreadRecord[];
+  /** True when terminal review evidence satisfies the configured stale-reviews policy, even while threads still block. */
+  currentHeadTerminal: boolean;
 }

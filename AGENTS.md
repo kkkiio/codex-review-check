@@ -19,17 +19,19 @@
 │   └── codex-review-check.yml   # Complete consumer workflow pinned to an immutable SHA
 ├── src/
 │   ├── github.ts                # Paginated GitHub REST and GraphQL state loading
-│   ├── index.ts                 # Action runtime, polling loop, outputs, and job summary
+│   ├── index.ts                 # Action runtime, polling loop, and outputs
+│   ├── messages.ts              # Agent-facing failure wording and job-summary text
 │   ├── state.ts                 # Pure Codex signal and blocking-state evaluation
 │   └── types.ts                 # Shared runtime records and evaluation types
 ├── test/
-│   ├── fixtures/                # Captured and normalized review-state examples
+│   ├── fixtures/                # Captured review-state examples and pinned message text
+│   ├── messages.test.ts         # Fixture-pinned wording for every failure reason
 │   └── state.test.ts            # Signal, current-HEAD, and thread-policy tests
 ├── package.json                 # Development commands and dependencies
 └── README.md                    # Short user getting-started guide
 ```
 
-Keep GitHub transport and pagination in `src/github.ts`, provider interpretation in `src/state.ts`, and polling plus user-facing results in `src/index.ts`. Keep compiled release code in `dist/`; consumers do not install dependencies at runtime.
+Keep GitHub transport and pagination in `src/github.ts`, provider interpretation in `src/state.ts`, user-facing wording in `src/messages.ts`, and polling plus runtime orchestration in `src/index.ts`. Keep compiled release code in `dist/`; consumers do not install dependencies at runtime.
 
 ### Documentation Map
 
@@ -57,6 +59,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 - When changing inputs or outputs, update `action.yml` and `docs/CONFIGURATION.md` together.
 - When changing accepted Codex evidence, update `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`.
 - When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links.
+- Agent-facing wording in `src/messages.ts` is pinned by plain-text fixtures in `test/fixtures/messages/`; regenerate with `npm run fixtures:update` and review the wording diff.
 
 ### Runtime and release
 

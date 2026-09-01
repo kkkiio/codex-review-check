@@ -1,0 +1,22 @@
+=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
+No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0. This setup expects Codex to review each push automatically — verify the connector triggered for this HEAD, then re-run: gh run rerun 33499862152 --failed
+
+=== job log lines (core.info) ===
+(none)
+
+=== job summary (web UI only) ===
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | none |
+
+## Review not observed
+
+No Codex review signal was found for the current PR HEAD after the grace period.
+
+This setup expects Codex to review each push automatically, so no manual review request is suggested. Verify the connector triggered for this HEAD, then re-run the failed check:
+
+```shell
+gh run rerun 33499862152 --failed
+```
