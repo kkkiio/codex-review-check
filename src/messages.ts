@@ -7,6 +7,25 @@ import type {
 
 export type FailureReason = "unresolved-threads" | "review-missing" | "review-timeout";
 
+/** True when the failure guidance includes a manual review request for the current HEAD. */
+export function suggestsReviewRequest(
+  reason: string,
+  evaluation: ReviewEvaluation,
+  reviewHint: ReviewHintPolicy,
+): boolean {
+  if (reviewHint !== "suggest") {
+    return false;
+  }
+  if (reason === "review-missing") {
+    return true;
+  }
+  return (
+    reason === "unresolved-threads" &&
+    !evaluation.currentHeadTerminal &&
+    !evaluation.currentHeadLiveness
+  );
+}
+
 export interface FailureOutput {
   /** Lines written to the job log via core.info before the failure annotation. */
   logLines: string[];

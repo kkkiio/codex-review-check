@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { failureOutput, summaryMarkdown, type FailureReason } from "../src/messages.js";
+import {
+  failureOutput,
+  suggestsReviewRequest,
+  summaryMarkdown,
+  type FailureReason,
+} from "../src/messages.js";
 import type {
   ReviewEvaluation,
   ReviewHintPolicy,
@@ -203,4 +208,63 @@ test("ready success summary", () => {
     "ready",
     summaryMarkdown(snapshot, evaluation, "success", "ready", RUN_ID, "suggest"),
   );
+});
+
+test("review-hint output matches the annotation guidance", () => {
+  const scenarios: [FailureReason, ReviewEvaluation][] = [
+    [
+      "unresolved-threads",
+      {
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+        currentHeadTerminal: false,
+        currentHeadAttested: false,
+        currentHeadLiveness: false,
+      },
+    ],
+    [
+      "unresolved-threads",
+      {
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+        currentHeadTerminal: false,
+        currentHeadAttested: false,
+        currentHeadLiveness: true,
+      },
+    ],
+    [
+      "unresolved-threads",
+      {
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+        currentHeadTerminal: true,
+        currentHeadAttested: true,
+        currentHeadLiveness: false,
+      },
+    ],
+    [
+      "review-missing",
+      {
+        phase: "missing",
+        signal: "none",
+        unresolvedThreads: [],
+        currentHeadTerminal: false,
+        currentHeadAttested: false,
+        currentHeadLiveness: false,
+      },
+    ],
+  ];
+  for (const [reason, evaluation] of scenarios) {
+    for (const policy of ["suggest", "suppress"] as const) {
+      const output = failureOutput(reason, snapshot, evaluation, RUN_ID, policy);
+      assert.equal(
+        suggestsReviewRequest(reason, evaluation, policy),
+        output.annotation.includes("'@codex review'"),
+        `${reason} terminal=${evaluation.currentHeadTerminal} liveness=${evaluation.currentHeadLiveness} policy=${policy}`,
+      );
+    }
+  }
 });

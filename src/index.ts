@@ -1,7 +1,12 @@
 import * as core from "@actions/core";
 import * as github from "@actions/github";
 import { loadReviewSnapshot } from "./github.js";
-import { failureOutput, reviewRequestCommand, summaryMarkdown } from "./messages.js";
+import {
+  failureOutput,
+  reviewRequestCommand,
+  suggestsReviewRequest,
+  summaryMarkdown,
+} from "./messages.js";
 import { evaluateReviewState } from "./state.js";
 import type {
   OutdatedPolicy,
@@ -37,10 +42,7 @@ async function publishResult(
   core.setOutput("head-sha", snapshot.headSha);
   core.setOutput("review-signal", evaluation.signal);
   core.setOutput("unresolved-count", evaluation.unresolvedThreads.length.toString());
-  const suggestReviewRequest =
-    reviewHintPolicy === "suggest" &&
-    (reason === "review-missing" ||
-      (reason === "unresolved-threads" && !evaluation.currentHeadTerminal));
+  const suggestReviewRequest = suggestsReviewRequest(reason, evaluation, reviewHintPolicy);
   core.setOutput(
     "review-hint",
     suggestReviewRequest ? reviewRequestCommand(snapshot.pullRequest) : "",
