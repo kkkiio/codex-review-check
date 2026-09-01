@@ -91,6 +91,8 @@ test("unresolved-threads, current HEAD already reviewed", () => {
     signal: "unresolved-threads",
     unresolvedThreads: blockingThreads,
     currentHeadTerminal: true,
+    currentHeadAttested: true,
+    currentHeadLiveness: false,
   };
   expectFixture("unresolved-threads", composite("unresolved-threads", evaluation, "suggest"));
 });
@@ -101,6 +103,8 @@ test("unresolved-threads, HEAD needs a review, hint suggested", () => {
     signal: "unresolved-threads",
     unresolvedThreads: blockingThreads,
     currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
   };
   expectFixture(
     "unresolved-threads-needs-review",
@@ -114,6 +118,8 @@ test("unresolved-threads, HEAD needs a review, hint suppressed", () => {
     signal: "unresolved-threads",
     unresolvedThreads: blockingThreads,
     currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
   };
   expectFixture(
     "unresolved-threads-auto-review",
@@ -127,6 +133,8 @@ test("review-missing, hint suggested", () => {
     signal: "none",
     unresolvedThreads: [],
     currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
   };
   expectFixture("review-missing", composite("review-missing", evaluation, "suggest"));
 });
@@ -137,6 +145,8 @@ test("review-missing, hint suppressed", () => {
     signal: "none",
     unresolvedThreads: [],
     currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
   };
   expectFixture("review-missing-auto-review", composite("review-missing", evaluation, "suppress"));
 });
@@ -147,8 +157,37 @@ test("review-timeout failure output", () => {
     signal: "progress-comment",
     unresolvedThreads: [],
     currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
   };
   expectFixture("review-timeout", composite("review-timeout", evaluation, "suggest"));
+});
+
+test("unresolved-threads, review already in progress", () => {
+  const evaluation: ReviewEvaluation = {
+    phase: "blocked",
+    signal: "unresolved-threads",
+    unresolvedThreads: blockingThreads,
+    currentHeadTerminal: false,
+    currentHeadAttested: false,
+    currentHeadLiveness: true,
+  };
+  expectFixture(
+    "unresolved-threads-review-in-progress",
+    composite("unresolved-threads", evaluation, "suggest"),
+  );
+});
+
+test("ready accepted under stale-reviews ignore", () => {
+  const evaluation: ReviewEvaluation = {
+    phase: "terminal",
+    signal: "review:commented",
+    unresolvedThreads: [],
+    currentHeadTerminal: true,
+    currentHeadAttested: false,
+    currentHeadLiveness: false,
+  };
+  expectFixture("ready-stale", summaryMarkdown(snapshot, evaluation, "success", "ready", RUN_ID, "suggest"));
 });
 
 test("ready success summary", () => {
@@ -157,6 +196,8 @@ test("ready success summary", () => {
     signal: "review:approved",
     unresolvedThreads: [],
     currentHeadTerminal: true,
+    currentHeadAttested: true,
+    currentHeadLiveness: false,
   };
   expectFixture(
     "ready",

@@ -63,7 +63,7 @@ Unresolved threads block under either setting; thread resolution and review fres
 
 The Action never spends Codex credits itself, but its failures can tell the agent to request a review with `gh pr comment <PR> --body '@codex review'`.
 
-- `suggest` presents that command whenever the current HEAD lacks accepted review evidence. This fits setups where Codex reviews only on pull request open, and setups with no automatic review at all — in both, a manual comment is the only way a later HEAD gets reviewed.
+- `suggest` presents that command when the current HEAD lacks accepted review evidence and no review of it is in progress. This fits setups where Codex reviews only on pull request open, and setups with no automatic review at all — in both, a manual comment is the only way a later HEAD gets reviewed.
 - `suppress` omits the command. Use it when Codex is configured to review every push: a missing review then means the connector did not fire, and the failure says to verify that instead of requesting a review manually.
 
 ## Pull request selection

@@ -67,4 +67,8 @@ export interface ReviewEvaluation {
   unresolvedThreads: ReviewThreadRecord[];
   /** True when terminal review evidence satisfies the configured stale-reviews policy, even while threads still block. */
   currentHeadTerminal: boolean;
+  /** True when terminal evidence attests the current HEAD specifically, independent of the stale-reviews policy. */
+  currentHeadAttested: boolean;
+  /** True when a fresh 👀 or progress comment shows a review of the current HEAD is running. */
+  currentHeadLiveness: boolean;
 }

@@ -78,10 +78,13 @@ export function evaluateReviewState(
   const botTerminalReviews = snapshot.reviews.filter(
     (review) => isBot(review.author) && terminalStates.has(review.state.toUpperCase()),
   );
+  const headTerminalReview = botTerminalReviews.find(
+    (review) => review.commitId.toLowerCase() === currentHead,
+  );
   const terminalReview =
     stalePolicy === "ignore"
-      ? botTerminalReviews[botTerminalReviews.length - 1]
-      : botTerminalReviews.find((review) => review.commitId.toLowerCase() === currentHead);
+      ? (headTerminalReview ?? botTerminalReviews[botTerminalReviews.length - 1])
+      : headTerminalReview;
 
   const botCleanSignals = snapshot.issueComments
     .filter((comment) => isBot(comment.author))
@@ -90,25 +93,42 @@ export function evaluateReviewState(
       (signal): signal is Extract<IssueCommentSignal, { kind: "terminal" }> =>
         signal.kind === "terminal",
     );
+  const headCleanSignal = botCleanSignals.find(
+    (signal) => signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef),
+  );
   const cleanSignal =
     stalePolicy === "ignore"
-      ? botCleanSignals[botCleanSignals.length - 1]
-      : botCleanSignals.find(
-          (signal) => signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef),
-        );
+      ? (headCleanSignal ?? botCleanSignals[botCleanSignals.length - 1])
+      : headCleanSignal;
 
-  const cleanReaction = observedReactions.find((reaction) => {
-    if (!isBot(reaction.author) || !new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase())) {
+  const botCleanReactions = observedReactions.filter(
+    (reaction) =>
+      isBot(reaction.author) && new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase()),
+  );
+  const isFresh = (record: { createdAt: string | null }) =>
+    (record.createdAt ? Date.parse(record.createdAt) : Number.NEGATIVE_INFINITY) >= headCommittedAt;
+  const headCleanReaction = botCleanReactions.find(isFresh);
+  const cleanReaction =
+    stalePolicy === "ignore"
+      ? (headCleanReaction ?? botCleanReactions[0])
+      : headCleanReaction;
+
+  const currentHeadAttested = Boolean(headTerminalReview ?? headCleanSignal ?? headCleanReaction);
+  const currentHeadTerminal = Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
+
+  const progressComment = snapshot.issueComments.find((comment) => {
+    if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
       return false;
     }
-    if (stalePolicy === "ignore") {
-      return true;
-    }
-    const createdAt = reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY;
-    return createdAt >= headCommittedAt;
+    return isFresh(comment);
   });
-
-  const currentHeadTerminal = Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
+  const eyesReaction = observedReactions.find((reaction) => {
+    if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
+      return false;
+    }
+    return isFresh(reaction);
+  });
+  const currentHeadLiveness = Boolean(progressComment ?? eyesReaction);
 
   const unresolvedThreads = snapshot.threads.filter((thread) => {
     if (thread.isResolved || (outdatedPolicy === "ignore" && thread.isOutdated)) {
@@ -122,6 +142,8 @@ export function evaluateReviewState(
       signal: "unresolved-threads",
       unresolvedThreads,
       currentHeadTerminal,
+      currentHeadAttested,
+      currentHeadLiveness,
     };
   }
   if (terminalReview || cleanSignal || cleanReaction) {
@@ -134,29 +156,19 @@ export function evaluateReviewState(
           : "clean-reaction",
       unresolvedThreads,
       currentHeadTerminal: true,
+      currentHeadAttested,
+      currentHeadLiveness,
     };
   }
 
-  const progressComment = snapshot.issueComments.find((comment) => {
-    if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
-      return false;
-    }
-    const createdAt = comment.createdAt ? Date.parse(comment.createdAt) : Number.NEGATIVE_INFINITY;
-    return createdAt >= headCommittedAt;
-  });
-  const eyesReaction = observedReactions.find((reaction) => {
-    if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
-      return false;
-    }
-    const createdAt = reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY;
-    return createdAt >= headCommittedAt;
-  });
   if (progressComment || eyesReaction) {
     return {
       phase: "reviewing",
       signal: progressComment ? "progress-comment" : "eyes",
       unresolvedThreads,
       currentHeadTerminal: false,
+      currentHeadAttested,
+      currentHeadLiveness: true,
     };
   }
 
@@ -165,5 +177,7 @@ export function evaluateReviewState(
     signal: "none",
     unresolvedThreads,
     currentHeadTerminal: false,
+    currentHeadAttested,
+    currentHeadLiveness: false,
   };
 }

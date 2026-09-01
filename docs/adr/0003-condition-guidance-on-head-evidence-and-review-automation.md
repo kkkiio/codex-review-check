@@ -17,6 +17,7 @@ Two further observations shape the fix:
 The unresolved-threads failure selects its guidance from live state:
 
 - Current HEAD already has accepted terminal evidence: resolve, then re-run.
+- A review of the current HEAD is already in progress (fresh liveness): resolve, then re-run — requesting another review would duplicate the running one.
 - Otherwise, with `review-hint: suggest` (default): resolve, then request a review with the printed command, then re-run. Resolving still comes first, preserving the credit ordering from ADR 0001.
 - Otherwise, with `review-hint: suppress`: resolve, then re-run; the message notes that Codex is expected to review each push automatically. In this mode a missing review is reported as a connector problem, not as a request to comment.
 
@@ -30,3 +31,4 @@ Failure guidance lives in the job log (the failure annotation and info lines), t
 - `review-hint: suppress` protects auto-review setups from double-spending credits on redundant manual requests; manual-only and on-pull-request setups keep the hint unchanged under `suggest`.
 - `stale-reviews: ignore` lets repositories treat the last Codex verdict as final across pushes, at the price of merging commits Codex never inspected.
 - ADR 0001 is refined rather than reversed: known findings are still resolved before any review request is suggested, but the request is now printed in the same failure when the HEAD will need it.
+- The success summary distinguishes evidence attesting the current HEAD from evidence accepted only via `stale-reviews: ignore`, so a relaxed gate never claims the latest commits were inspected.

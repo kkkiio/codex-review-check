@@ -1,0 +1,9 @@
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | review:commented |
+
+## Ready
+
+Codex produced terminal evidence accepted under the configured stale-reviews policy, and no configured unresolved thread blocks. The evidence may attest an older HEAD rather than the current one.

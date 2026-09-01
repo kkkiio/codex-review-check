@@ -252,3 +252,55 @@ test("blocked results expose whether the current HEAD already has terminal evide
   assert.equal(staleTerminalAccepted.phase, "blocked");
   assert.equal(staleTerminalAccepted.currentHeadTerminal, true);
 });
+
+test("blocked results expose current-HEAD liveness", () => {
+  const reviewRunning = evaluateReviewState(
+    { ...fixtures.base, reactions: [fixtures.eyes], threads: [fixtures.unresolvedThread] },
+    bots,
+    "block",
+    "block",
+  );
+  assert.equal(reviewRunning.phase, "blocked");
+  assert.equal(reviewRunning.currentHeadTerminal, false);
+  assert.equal(reviewRunning.currentHeadLiveness, true);
+
+  const noReview = evaluateReviewState(
+    { ...fixtures.base, threads: [fixtures.unresolvedThread] },
+    bots,
+    "block",
+    "block",
+  );
+  assert.equal(noReview.phase, "blocked");
+  assert.equal(noReview.currentHeadLiveness, false);
+});
+
+test("currentHeadAttested tracks strict HEAD binding regardless of stale policy", () => {
+  const attested = evaluateReviewState(
+    { ...fixtures.base, reviews: [fixtures.terminalReview] },
+    bots,
+    "block",
+    "block",
+  );
+  assert.equal(attested.phase, "terminal");
+  assert.equal(attested.currentHeadAttested, true);
+
+  const staleAccepted = evaluateReviewState(
+    { ...fixtures.base, reviews: [fixtures.oldReview] },
+    bots,
+    "block",
+    "ignore",
+  );
+  assert.equal(staleAccepted.phase, "terminal");
+  assert.equal(staleAccepted.currentHeadTerminal, true);
+  assert.equal(staleAccepted.currentHeadAttested, false);
+
+  const staleBlocked = evaluateReviewState(
+    { ...fixtures.base, reviews: [fixtures.oldReview], threads: [fixtures.unresolvedThread] },
+    bots,
+    "block",
+    "ignore",
+  );
+  assert.equal(staleBlocked.phase, "blocked");
+  assert.equal(staleBlocked.currentHeadTerminal, true);
+  assert.equal(staleBlocked.currentHeadAttested, false);
+});

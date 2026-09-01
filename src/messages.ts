@@ -59,6 +59,15 @@ export function failureOutput(
           "If you already resolved them after this run started, no further action is needed — just re-run.",
       };
     }
+    if (evaluation.currentHeadLiveness) {
+      return {
+        logLines,
+        annotation:
+          `${count} A Codex review of the current HEAD is already in progress. ` +
+          `Next steps: 1) resolve each handled conversation 2) ${rerun}. ` +
+          "If you already resolved them after this run started, no further action is needed — just re-run.",
+      };
+    }
     if (reviewHint === "suggest") {
       return {
         logLines,
@@ -172,6 +181,16 @@ export function summaryMarkdown(
         rerun,
         "```",
       );
+    } else if (evaluation.currentHeadLiveness) {
+      lines.push(
+        "A Codex review of the current HEAD is already in progress, so no new review request is needed. Resolve the conversations above, then re-run the failed job:",
+        "",
+        "```shell",
+        rerun,
+        "```",
+        "",
+        "If you already resolved the conversations after this run started, just re-run.",
+      );
     } else if (reviewHint === "suggest") {
       lines.push(
         "The current HEAD also has no Codex review yet, so resolving alone is not enough. After resolving, request a fresh review:",
@@ -208,11 +227,16 @@ export function summaryMarkdown(
       "```",
     );
   } else {
-    lines.push(
-      "## Ready",
-      "",
-      "Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.",
-    );
+    lines.push("## Ready", "");
+    if (evaluation.currentHeadAttested) {
+      lines.push(
+        "Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.",
+      );
+    } else {
+      lines.push(
+        "Codex produced terminal evidence accepted under the configured stale-reviews policy, and no configured unresolved thread blocks. The evidence may attest an older HEAD rather than the current one.",
+      );
+    }
   }
   return `${lines.join("\n")}\n`;
 }
