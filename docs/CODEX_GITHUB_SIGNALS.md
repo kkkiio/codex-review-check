@@ -1,13 +1,13 @@
 # Codex review signals on GitHub pull requests
 
-This document records what the Codex GitHub connector observably does on pull requests, as of 2026-09-01. It exists to make provider behavior drift visible. Everything here is an observation, not an OpenAI API guarantee: OpenAI's public product description documents only that a pull request can explicitly request review with `@codex review`. The reaction payloads, progress sentences, clean-result text, and `Reviewed commit` markers are undocumented presentation details that can change without notice.
+This document records what the Codex GitHub connector observably does on pull requests, as of 2026-09-01. It exists to make provider behavior drift visible.
+
+OpenAI documents the connector's user-facing controls in [Codex code review in GitHub](https://learn.chatgpt.com/codex/third-party/github) (summarized in [the code-review use case](https://learn.chatgpt.com/use-cases/github-code-reviews)): the `@codex review` request, the 👀 acknowledgment reaction, automatic review triggers, a stated focus on P0/P1 findings, and `AGENTS.md` review rules. The progress-sentence grammar, clean-result comment format, `Reviewed commit` marker, and `+1` reaction transition remain undocumented presentation details that can change without notice. Everything beyond the documented controls is an observation, not an OpenAI API guarantee.
 
 ## Two sources of truth
 
 1. GitHub's documented data model: pull request review `commit_id`, GraphQL review-thread `isResolved` and `isOutdated`, author identity, timestamps, and pagination. Comparatively stable.
 2. Codex's currently observed presentation: connector login, 👀 reaction, progress text, clean-result text, and the `Reviewed commit` marker. Can change without this repository changing.
-
-How this Action turns these observations into pass, wait, or block decisions is policy and lives in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## Observed lifecycle
 
@@ -69,3 +69,4 @@ Useful read-only inspection surfaces are the REST pull request reviews, issue re
 - 2026-08-31, [`kkkiio/pi-workmap#5`](https://github.com/kkkiio/pi-workmap/pull/5): Codex auto-review first created 👀, then replaced it with a fresh `+1`; it did not create a submitted review or clean issue comment. This live observation added `clean-reaction` support and corresponding stale/fresh fixtures.
 - 2026-08-31, the explicit `@codex review` follow-up on the same PR: Codex attached 👀 to the request comment rather than the PR body. This added paginated request-comment reaction reads and fixture coverage.
 - 2026-09-01, [`kkkiio/codex-review-check#1`](https://github.com/kkkiio/codex-review-check/pull/1): first dogfood run of the log-first failure guidance. The run failed fast on a real unresolved thread and printed the three-step sequence; Codex's review of that PR also flagged that this document had drifted from the action's new `stale-reviews` policy, prompting the split between behavior (here) and policy (CONFIGURATION.md).
+- 2026-09-01, same PR: findings arrived with P2 badges although the product documentation states that Codex flags only P0 and P1 issues in GitHub. Treat badge severities as presentational.

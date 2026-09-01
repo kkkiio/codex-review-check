@@ -13,7 +13,7 @@
 ├── docs/
 │   ├── CONFIGURATION.md         # User-facing inputs, outputs, policies, and rerun reference
 │   ├── CODEX_GITHUB_SIGNALS.md  # Observed provider behavior and accepted evidence
-│   ├── REFERENCES.md            # Upstream sources and deliberate design differences
+│   ├── research.md              # Upstream sources and deliberate design differences
 │   └── adr/                     # Architecture decisions and their consequences
 ├── examples/
 │   └── codex-review-check.yml   # Complete consumer workflow pinned to an immutable SHA
@@ -36,7 +36,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 ### Documentation Map
 
 - [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior on GitHub pull requests. Acceptance policy lives in `docs/CONFIGURATION.md`.
-- [`docs/REFERENCES.md`](docs/REFERENCES.md) — Upstream projects, GitHub documentation, and deliberate design differences.
+- [`docs/research.md`](docs/research.md) — Upstream projects, product and GitHub documentation, and deliberate design differences.
 - [`docs/adr/0001-resolve-known-findings-before-requesting-review.md`](docs/adr/0001-resolve-known-findings-before-requesting-review.md) — Decision to resolve known findings before suggesting another review.
 - [`docs/adr/0002-use-one-polling-coordinator-per-pull-request.md`](docs/adr/0002-use-one-polling-coordinator-per-pull-request.md) — Decision to let one PR-head run observe the Codex lifecycle without comment-triggered replacement runs.
 
