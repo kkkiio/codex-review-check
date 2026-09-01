@@ -2,7 +2,7 @@
 
 <p align="center">
   <a href="https://github.com/kkkiio/pi-workmap/pull/6">
-    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing Codex Review failure and CI success" width="930">
+    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
   </a>
 </p>
 
