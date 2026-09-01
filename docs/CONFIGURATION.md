@@ -41,6 +41,15 @@ Do not also subscribe the same workflow to `pull_request_review`, `pull_request_
 
 Keep `cancel-in-progress: true` for the pull-request concurrency group so a new `synchronize` event replaces work tied to an older HEAD. After a missing-review or unresolved-thread failure, use the standard rerun printed in the failure log line and the job summary.
 
+## What satisfies the check
+
+The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
+
+- Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
+- A terminal artifact passes it when it attests the current HEAD — or an older one under `stale-reviews: ignore`.
+- Unresolved Codex review threads block under `outdated-threads: block`.
+- Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
+
 ## Outdated threads
 
 GitHub exposes `isResolved` and `isOutdated` independently.

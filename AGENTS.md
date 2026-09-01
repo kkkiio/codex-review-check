@@ -35,7 +35,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 
 ### Documentation Map
 
-- [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior and accepted lifecycle evidence.
+- [`docs/CODEX_GITHUB_SIGNALS.md`](docs/CODEX_GITHUB_SIGNALS.md) — Observed connector behavior on GitHub pull requests. Acceptance policy lives in `docs/CONFIGURATION.md`.
 - [`docs/REFERENCES.md`](docs/REFERENCES.md) — Upstream projects, GitHub documentation, and deliberate design differences.
 - [`docs/adr/0001-resolve-known-findings-before-requesting-review.md`](docs/adr/0001-resolve-known-findings-before-requesting-review.md) — Decision to resolve known findings before suggesting another review.
 - [`docs/adr/0002-use-one-polling-coordinator-per-pull-request.md`](docs/adr/0002-use-one-polling-coordinator-per-pull-request.md) — Decision to let one PR-head run observe the Codex lifecycle without comment-triggered replacement runs.
@@ -57,7 +57,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 ### Behavior and documentation
 
 - When changing inputs or outputs, update `action.yml` and `docs/CONFIGURATION.md` together.
-- When changing accepted Codex evidence, update `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`.
+- When Codex connector behavior is newly observed or changes, record it in `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`; keep acceptance policy in `docs/CONFIGURATION.md` and out of the behavior record.
 - When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links.
 - Agent-facing wording in `src/messages.ts` is pinned by plain-text fixtures in `test/fixtures/messages/`; regenerate with `npm run fixtures:update` and review the wording diff.
 
