@@ -31,7 +31,7 @@ Terminal PR reviews bind strongly through an exact 40-hex `commit_id == pull_req
 
 The 👀 and `+1` reactions have no commit field. The Action reads PR-body reactions and reactions attached to `@codex review` issue comments, accepting either only when `created_at` is not earlier than the current HEAD commit timestamp. 👀 is liveness-only; a fresh `+1` is the observed clean terminal transition. Timestamp comparison is weaker than `commit_id`, but it rejects a reaction created before the current HEAD and matches the connector behavior observed on a real PR.
 
-An old review, a clean marker for a different commit, or an old 👀 does not satisfy current-head semantics.
+An old review, a clean marker for a different commit, or an old 👀 does not satisfy current-head semantics under the default `stale-reviews: block` policy. With `stale-reviews: ignore`, the most recent terminal review, clean comment, or `+1` reaction satisfies the check even when it attests an older HEAD; see [CONFIGURATION.md](CONFIGURATION.md#stale-reviews).
 
 ## Terminal and clean signals
 
@@ -44,9 +44,11 @@ The clean-comment parser is narrower than general natural-language matching:
 - exactly one `**Reviewed commit:** \`<10-or-40-hex>\`` line must exist;
 - the marker must match current HEAD.
 
-The connector currently removes 👀 and creates a new PR-level `+1` when a review finishes cleanly without a submitted review. The Action accepts only a fresh reaction relative to the current HEAD timestamp. An older persistent thumbs-up cannot satisfy a later HEAD. Because reactions are not commit-bound, submitted review `commit_id` and clean-comment `Reviewed commit` remain stronger evidence.
+The connector currently removes 👀 and creates a new PR-level `+1` when a review finishes cleanly without a submitted review. The Action accepts only a fresh reaction relative to the current HEAD timestamp. An older persistent thumbs-up cannot satisfy a later HEAD unless `stale-reviews: ignore` is configured. Because reactions are not commit-bound, submitted review `commit_id` and clean-comment `Reviewed commit` remain stronger evidence.
 
 ## Observation log
+
+- 2026-09-01, [`kkkiio/codex-review-check#1`](https://github.com/kkkiio/codex-review-check/pull/1): first dogfood run of the log-first failure guidance. The run failed fast on a real unresolved thread and printed the three-step sequence; Codex's review of that PR caught that this document still forbade stale evidence while `stale-reviews: ignore` accepts it, prompting this policy-exception wording.
 
 - 2026-08-31, [`kkkiio/pi-workmap#5`](https://github.com/kkkiio/pi-workmap/pull/5): Codex auto-review first created 👀, then replaced it with a fresh `+1`; it did not create a submitted review or clean issue comment. This live observation added `clean-reaction` support and corresponding stale/fresh fixtures.
 - 2026-08-31, the explicit `@codex review` follow-up on the same PR: Codex attached 👀 to the request comment rather than the PR body. This added paginated request-comment reaction reads and fixture coverage.
@@ -92,9 +94,9 @@ Useful read-only inspection surfaces are the REST pull request reviews, issue re
 The following do not make this Action pass:
 
 - the workflow's original `GITHUB_SHA`;
-- a prior-HEAD Codex review;
+- a prior-HEAD Codex review (with the default `stale-reviews: block`);
 - a human review or human-authored thread;
-- a thumbs-up reaction created before the current HEAD;
+- a thumbs-up reaction created before the current HEAD (with the default `stale-reviews: block`);
 - 👀 by itself;
 - thread `isOutdated: true` when the configured policy is `block`;
 - old commit statuses, marker comments, retry counters, or scheduled reconciler state.
