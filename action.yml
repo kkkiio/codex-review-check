@@ -1,5 +1,5 @@
 name: Codex Review Check
-description: Wait for a current-head Codex review and block unresolved Codex review threads without requesting a review automatically.
+description: Wait for a current-head Codex LGTM and block unresolved Codex review threads without requesting a review automatically.
 author: xieziheng
 
 branding:
@@ -34,14 +34,10 @@ inputs:
     description: Seconds to let review threads propagate after a terminal review signal appears.
     required: false
     default: '15'
-  outdated-threads:
-    description: Whether unresolved outdated Codex threads block. Accepted values are block and ignore.
+  pass-without-lgtm:
+    description: Pass when Codex completed a review without leaving an LGTM (a 👍 reaction or a 'Didn't find any major issues' comment) on the current HEAD. Default false requires that LGTM.
     required: false
-    default: block
-  stale-reviews:
-    description: Whether terminal Codex review evidence for an older HEAD satisfies the check. Accepted values are block and ignore.
-    required: false
-    default: block
+    default: 'false'
   review-hint:
     description: Whether failures suggest the manual gh pr comment review request. Use suppress when Codex reviews every push automatically. Accepted values are suggest and suppress.
     required: false
@@ -55,9 +51,9 @@ outputs:
   head-sha:
     description: Current pull request HEAD read from GitHub during this run.
   review-signal:
-    description: Current-head Codex review signal selected by the action.
+    description: Codex review or blocking signal selected by the action.
   unresolved-count:
-    description: Number of unresolved Codex review threads under the configured outdated policy.
+    description: Number of unresolved Codex review threads blocking this check.
   review-hint:
     description: gh command that requests Codex review. Populated when the action suggests a manual review request for the current HEAD.
 

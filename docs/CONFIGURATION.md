@@ -12,9 +12,8 @@ Codex Review Check reads live pull request state on every attempt. The complete 
 | `grace-seconds` | no | `60` | Wait before a missing-review hint fails |
 | `review-timeout-seconds` | no | `1800` | Maximum wait after review liveness appears |
 | `poll-interval-seconds` | no | `10` | Delay between live GitHub state reads |
-| `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence |
-| `outdated-threads` | no | `block` | Either `block` or `ignore` for unresolved outdated threads |
-| `stale-reviews` | no | `block` | Either `block` or `ignore` for terminal review evidence attesting an older HEAD |
+| `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence, before both success and missing-LGTM failures |
+| `pass-without-lgtm` | no | `false` | Pass a completed review without a current-HEAD LGTM; `true` is the explicit lenient opt-out |
 | `review-hint` | no | `suggest` | Either `suggest` or `suppress` the manual `@codex review` request hint |
 
 The workflow token needs only:
@@ -46,27 +45,21 @@ Keep `cancel-in-progress: true` for the pull-request concurrency group so a new 
 The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
 
 - Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
-- A terminal artifact passes it when it attests the current HEAD — or an older one under `stale-reviews: ignore`.
-- Unresolved Codex review threads block under `outdated-threads: block`.
+- In the default strict mode, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
+- A terminal review with `COMMENTED`, `CHANGES_REQUESTED`, or `APPROVED` state is not an LGTM, even when it has no findings.
+- A completed review awaiting an LGTM yields to a follow-up review in progress: liveness newer than that review's submission keeps the job waiting up to `review-timeout-seconds` instead of failing `lgtm-missing`. Liveness left over from the completed review itself does not.
+- In lenient mode, a completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, but unresolved threads still block.
 - Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
 
-## Outdated threads
+## LGTM requirement
 
-GitHub exposes `isResolved` and `isOutdated` independently.
+`pass-without-lgtm` controls whether a completed review must include Codex's own clean verdict:
 
-- `block` keeps every unresolved Codex thread blocking, including `isOutdated: true` threads.
-- `ignore` omits unresolved outdated threads but still blocks unresolved current threads.
+- The default `false` requires an LGTM on the current HEAD. An LGTM is either a 👍 reaction from the configured Codex bot created at or after the HEAD commit, or a bot issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one `Reviewed commit` marker matching the current HEAD.
+- Set `pass-without-lgtm: true` to accept the most recent terminal review, clean comment, or 👍 without requiring an LGTM on the current HEAD. This can be useful for iteration loops where requiring a new clean verdict after every push would not converge.
+- Every unresolved Codex review thread blocks in both modes, including threads GitHub marks outdated. Resolve each finding by fixing it, or reply with your reasoning on the thread and then resolve it; silent resolves are not auditable.
 
-Known blocking threads always take precedence over lifecycle state. The failure tells the agent to resolve them first; when the current HEAD also lacks accepted review evidence and `review-hint` is `suggest`, the same failure includes the review request as the step after resolving.
-
-## Stale reviews
-
-A terminal Codex review attests the commit it was submitted against. A push replaces the HEAD, so an older review no longer covers it.
-
-- `block` requires terminal evidence attesting the current HEAD; anything older is treated as no review.
-- `ignore` accepts the most recent terminal review, clean comment, or 👍 reaction even when it attests an older HEAD. Use this only when you are comfortable treating the last Codex verdict as final across pushes.
-
-Unresolved threads block under either setting; thread resolution and review freshness are independent concerns.
+Known blocking threads always take precedence over lifecycle state. After they are handled, strict mode may require a fresh review to obtain an LGTM.
 
 ## Review hint
 
@@ -86,10 +79,10 @@ The Action infers this number from pull request, review, review-comment, and pul
 | Output | Meaning |
 | --- | --- |
 | `state` | Final `success` or `failure` state |
-| `reason` | Machine-readable final reason |
+| `reason` | Machine-readable final reason (`ready`, `unresolved-threads`, `review-missing`, `review-timeout`, or `lgtm-missing`) |
 | `head-sha` | Live pull request HEAD evaluated by this attempt |
 | `review-signal` | Selected Codex lifecycle or blocking signal |
-| `unresolved-count` | Number of threads that block under the outdated policy |
+| `unresolved-count` | Number of unresolved Codex review threads blocking this check |
 | `review-hint` | `gh` review-request command, populated when the action suggests a manual review request |
 
 ## Reruns

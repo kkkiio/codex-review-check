@@ -5,7 +5,11 @@ import type {
   ReviewThreadRecord,
 } from "./types.js";
 
-export type FailureReason = "unresolved-threads" | "review-missing" | "review-timeout";
+export type FailureReason =
+  | "unresolved-threads"
+  | "review-missing"
+  | "review-timeout"
+  | "lgtm-missing";
 
 /** True when the failure guidance includes a manual review request for the current HEAD. */
 export function suggestsReviewRequest(
@@ -16,7 +20,7 @@ export function suggestsReviewRequest(
   if (reviewHint !== "suggest") {
     return false;
   }
-  if (reason === "review-missing") {
+  if (reason === "review-missing" || reason === "lgtm-missing") {
     return true;
   }
   return (
@@ -51,6 +55,9 @@ function threadUrl(thread: ReviewThreadRecord): string | undefined {
   return thread.comments.find((comment) => comment.url)?.url ?? undefined;
 }
 
+const auditTrailGuidance =
+  "Resolve each thread: fix the finding, or reply with your reasoning on the thread, then resolve. Silent resolves are not auditable.";
+
 /**
  * Compose everything an agent can see when the check fails: job-log lines plus the
  * single-line failure annotation. The job summary never reaches CLI agents, so any
@@ -62,6 +69,7 @@ export function failureOutput(
   evaluation: ReviewEvaluation,
   runId: string | undefined,
   reviewHint: ReviewHintPolicy,
+  passWithoutLgtm = false,
 ): FailureOutput {
   const rerun = rerunCommand(runId);
   if (reason === "unresolved-threads") {
@@ -74,7 +82,7 @@ export function failureOutput(
       return {
         logLines,
         annotation:
-          `${count} Resolve each handled conversation, then re-run: ${rerun}. ` +
+          `${count} ${auditTrailGuidance} Then re-run: ${rerun}. ` +
           "If you already resolved them after this run started, no further action is needed — just re-run.",
       };
     }
@@ -82,8 +90,8 @@ export function failureOutput(
       return {
         logLines,
         annotation:
-          `${count} A Codex review of the current HEAD is already in progress. ` +
-          `Next steps: 1) resolve each handled conversation 2) ${rerun}. ` +
+          `${count} A Codex review of the current HEAD is already in progress. ${auditTrailGuidance} ` +
+          `Then re-run: ${rerun}. ` +
           "If you already resolved them after this run started, no further action is needed — just re-run.",
       };
     }
@@ -91,15 +99,15 @@ export function failureOutput(
       return {
         logLines,
         annotation:
-          `${count} The current HEAD has no Codex review yet. Next steps: ` +
-          `1) resolve each handled conversation 2) ${reviewRequestCommand(snapshot.pullRequest)} 3) ${rerun}. ` +
-          "If you already resolved the threads after this run started, start at step 2.",
+          `${count} The current HEAD has no Codex review yet. ${auditTrailGuidance} ` +
+          `Then request a fresh review: ${reviewRequestCommand(snapshot.pullRequest)} — then re-run: ${rerun}. ` +
+          "If you already resolved the threads after this run started, start with the review request.",
       };
     }
     return {
       logLines,
       annotation:
-        `${count} Next steps: 1) resolve each handled conversation 2) ${rerun}. ` +
+        `${count} ${auditTrailGuidance} Then re-run: ${rerun}. ` +
         "Codex is expected to review each push automatically; if no review for the current HEAD arrives, check the connector configuration.",
     };
   }
@@ -120,6 +128,24 @@ export function failureOutput(
         `then re-run: ${rerun}`,
     };
   }
+  if (reason === "lgtm-missing") {
+    const message =
+      `Codex reviewed the current HEAD ${snapshot.headSha} but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).`;
+    if (reviewHint === "suggest") {
+      return {
+        logLines: [message],
+        annotation:
+          `${message} Request a fresh review after handling its threads: ${reviewRequestCommand(snapshot.pullRequest)} — ` +
+          `then re-run: ${rerun}. Or set pass-without-lgtm: true to accept a completed review without an LGTM.`,
+      };
+    }
+    return {
+      logLines: [message],
+      annotation:
+        `${message} Verify the connector triggered a fresh review after handling its threads, then re-run: ${rerun}. ` +
+        "Or set pass-without-lgtm: true to accept a completed review without an LGTM.",
+    };
+  }
   return {
     logLines: [],
     annotation:
@@ -136,6 +162,7 @@ export function summaryMarkdown(
   reason: string,
   runId: string | undefined,
   reviewHint: ReviewHintPolicy,
+  passWithoutLgtm = false,
 ): string {
   const rerun = rerunCommand(runId);
   const lines = [
@@ -182,7 +209,7 @@ export function summaryMarkdown(
     lines.push(
       "## Blocking Codex review threads",
       "",
-      "Resolve each handled GitHub review conversation, then re-run this check.",
+      auditTrailGuidance,
       "",
     );
     for (const thread of evaluation.unresolvedThreads) {
@@ -194,7 +221,7 @@ export function summaryMarkdown(
     lines.push("");
     if (evaluation.currentHeadTerminal) {
       lines.push(
-        "If these conversations are already resolved — for example, you resolved them after this run started — no further action is needed. This failure reflects the state observed during the run; re-run the failed job to re-evaluate the live state:",
+        "The terminal pass-condition is already satisfied. After the threads are handled, re-run the failed job to re-evaluate the live state:",
         "",
         "```shell",
         rerun,
@@ -202,17 +229,15 @@ export function summaryMarkdown(
       );
     } else if (evaluation.currentHeadLiveness) {
       lines.push(
-        "A Codex review of the current HEAD is already in progress, so no new review request is needed. Resolve the conversations above, then re-run the failed job:",
+        "A Codex review of the current HEAD is already in progress, so no new review request is needed. After the threads are handled, re-run the failed job:",
         "",
         "```shell",
         rerun,
         "```",
-        "",
-        "If you already resolved the conversations after this run started, just re-run.",
       );
     } else if (reviewHint === "suggest") {
       lines.push(
-        "The current HEAD also has no Codex review yet, so resolving alone is not enough. After resolving, request a fresh review:",
+        "The current HEAD also has no Codex review yet. After the threads are handled, request a fresh review:",
         "",
         "```shell",
         reviewRequestCommand(snapshot.pullRequest),
@@ -223,18 +248,47 @@ export function summaryMarkdown(
         "```shell",
         rerun,
         "```",
-        "",
-        "If you already resolved the conversations after this run started, start with the review request.",
       );
     } else {
       lines.push(
-        "Codex is expected to review each push automatically, so no manual review request is suggested. If these conversations are already resolved — for example, you resolved them after this run started — just re-run the failed job:",
+        "Codex is expected to review each push automatically, so no manual review request is suggested. After the threads are handled, verify the connector and re-run the failed job:",
         "",
         "```shell",
         rerun,
         "```",
       );
     }
+  } else if (reason === "lgtm-missing") {
+    lines.push(
+      "## LGTM missing",
+      "",
+      `Codex reviewed the current HEAD \`${snapshot.headSha}\` but left no LGTM (a 👍 reaction or a \'Didn't find any major issues\' comment).`,
+      "",
+    );
+    if (reviewHint === "suggest") {
+      lines.push(
+        "Request a fresh review after handling its threads:",
+        "",
+        "```shell",
+        reviewRequestCommand(snapshot.pullRequest),
+        "```",
+        "",
+        "Then re-run the failed check:",
+        "",
+        "```shell",
+        rerun,
+        "```",
+      );
+    } else {
+      lines.push(
+        "Verify the connector triggered a fresh review after handling its threads, then re-run the failed check:",
+        "",
+        "```shell",
+        rerun,
+        "```",
+      );
+    }
+    lines.push("", "Or set `pass-without-lgtm: true` to accept a completed review without an LGTM.");
   } else if (reason === "review-timeout") {
     lines.push(
       "## Review still in progress",
@@ -247,13 +301,13 @@ export function summaryMarkdown(
     );
   } else {
     lines.push("## Ready", "");
-    if (evaluation.currentHeadAttested) {
+    if (passWithoutLgtm) {
       lines.push(
-        "Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.",
+        "Codex completed a review and it was accepted without an LGTM under `pass-without-lgtm`. No unresolved Codex review thread blocks.",
       );
     } else {
       lines.push(
-        "Codex produced terminal evidence accepted under the configured stale-reviews policy, and no configured unresolved thread blocks. The evidence may attest an older HEAD rather than the current one.",
+        "Codex left an LGTM attesting the current HEAD and no unresolved Codex review thread blocks.",
       );
     }
   }
