@@ -1,9 +1,7 @@
 # Codex Review Check
 
 <p align="center">
-  <a href="https://github.com/kkkiio/pi-workmap/pull/6">
-    <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
-  </a>
+  <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
 </p>
 
 Codex Review Check is a read-only, credit-aware GitHub Action that guides agents through the Codex review loop: it surfaces known findings first and requires a current-HEAD Codex LGTM by default.
