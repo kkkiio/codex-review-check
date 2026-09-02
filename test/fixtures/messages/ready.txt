@@ -2,8 +2,8 @@
 
 | Pull request | HEAD | State | Signal |
 | --- | --- | --- | --- |
-| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | review:approved |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | clean-reaction |
 
 ## Ready
 
-Codex produced a terminal signal for the current HEAD and no configured unresolved thread blocks.
+Codex left an LGTM attesting the current HEAD and no unresolved Codex review thread blocks.

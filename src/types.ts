@@ -1,7 +1,3 @@
-export type OutdatedPolicy = "block" | "ignore";
-
-export type StalePolicy = "block" | "ignore";
-
 export type ReviewHintPolicy = "suggest" | "suppress";
 
 export interface ReviewRecord {
@@ -62,13 +58,15 @@ export type IssueCommentSignal =
   | { kind: "none"; name: "none"; commitRef: null };
 
 export interface ReviewEvaluation {
-  phase: "blocked" | "terminal" | "reviewing" | "missing";
+  phase: "blocked" | "terminal" | "awaiting-lgtm" | "reviewing" | "missing";
   signal: string;
   unresolvedThreads: ReviewThreadRecord[];
-  /** True when terminal review evidence satisfies the configured stale-reviews policy, even while threads still block. */
+  /**
+   * True when the configured terminal pass-condition is already satisfied by
+   * existing evidence, even while threads still block: any terminal evidence
+   * in lenient mode, or a current-HEAD LGTM in strict mode.
+   */
   currentHeadTerminal: boolean;
-  /** True when terminal evidence attests the current HEAD specifically, independent of the stale-reviews policy. */
-  currentHeadAttested: boolean;
   /** True when a fresh 👀 or progress comment shows a review of the current HEAD is running. */
   currentHeadLiveness: boolean;
 }

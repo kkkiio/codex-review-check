@@ -6,4 +6,4 @@
 
 ## Ready
 
-Codex produced terminal evidence accepted under the configured stale-reviews policy, and no configured unresolved thread blocks. The evidence may attest an older HEAD rather than the current one.
+Codex completed a review and it was accepted without an LGTM under `pass-without-lgtm`. No unresolved Codex review thread blocks.

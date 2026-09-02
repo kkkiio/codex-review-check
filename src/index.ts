@@ -8,13 +8,7 @@ import {
   summaryMarkdown,
 } from "./messages.js";
 import { evaluateReviewState } from "./state.js";
-import type {
-  OutdatedPolicy,
-  ReviewEvaluation,
-  ReviewHintPolicy,
-  ReviewSnapshot,
-  StalePolicy,
-} from "./types.js";
+import type { ReviewEvaluation, ReviewHintPolicy, ReviewSnapshot } from "./types.js";
 
 interface RuntimeConfig {
   token: string;
@@ -25,8 +19,7 @@ interface RuntimeConfig {
   reviewTimeoutSeconds: number;
   pollIntervalSeconds: number;
   terminalSettleSeconds: number;
-  outdatedPolicy: OutdatedPolicy;
-  stalePolicy: StalePolicy;
+  passWithoutLgtm: boolean;
   reviewHintPolicy: ReviewHintPolicy;
 }
 
@@ -36,6 +29,7 @@ async function publishResult(
   state: "success" | "failure",
   reason: string,
   reviewHintPolicy: ReviewHintPolicy,
+  passWithoutLgtm: boolean,
 ): Promise<void> {
   core.setOutput("state", state);
   core.setOutput("reason", reason);
@@ -55,6 +49,7 @@ async function publishResult(
       reason,
       process.env.GITHUB_RUN_ID,
       reviewHintPolicy,
+      passWithoutLgtm,
     ),
   );
   await core.summary.write();
@@ -90,13 +85,9 @@ async function run(): Promise<void> {
   if (integerInputs.pollIntervalSeconds === 0) {
     throw new Error("poll-interval-seconds must be greater than zero.");
   }
-  const outdatedInput = core.getInput("outdated-threads").trim().toLowerCase();
-  if (outdatedInput !== "block" && outdatedInput !== "ignore") {
-    throw new Error("outdated-threads must be exactly block or ignore.");
-  }
-  const staleInput = core.getInput("stale-reviews").trim().toLowerCase();
-  if (staleInput !== "block" && staleInput !== "ignore") {
-    throw new Error("stale-reviews must be exactly block or ignore.");
+  const passWithoutLgtmInput = core.getInput("pass-without-lgtm").trim().toLowerCase();
+  if (passWithoutLgtmInput !== "true" && passWithoutLgtmInput !== "false") {
+    throw new Error("pass-without-lgtm must be exactly true or false.");
   }
   const reviewHintInput = core.getInput("review-hint").trim().toLowerCase();
   if (reviewHintInput !== "suggest" && reviewHintInput !== "suppress") {
@@ -115,8 +106,7 @@ async function run(): Promise<void> {
         .filter(Boolean),
     ),
     ...integerInputs,
-    outdatedPolicy: outdatedInput,
-    stalePolicy: staleInput,
+    passWithoutLgtm: passWithoutLgtmInput === "true",
     reviewHintPolicy: reviewHintInput,
   };
   if (config.botLogins.size === 0) {
@@ -138,14 +128,9 @@ async function run(): Promise<void> {
       lastPhase = "";
       core.info(`Evaluating live pull request HEAD ${observedHeadSha}.`);
     }
-    const evaluation = evaluateReviewState(
-      snapshot,
-      config.botLogins,
-      config.outdatedPolicy,
-      config.stalePolicy,
-    );
+    const evaluation = evaluateReviewState(snapshot, config.botLogins, config.passWithoutLgtm);
     const elapsedSeconds = Math.floor((Date.now() - headStartedAt) / 1000);
-    livenessSeen ||= evaluation.phase !== "missing";
+    livenessSeen ||= evaluation.phase === "reviewing";
     if (evaluation.phase !== lastPhase) {
       core.info(
         `Codex Review state for ${snapshot.repository}#${snapshot.pullRequest} at ${snapshot.headSha}: ${evaluation.phase} (${evaluation.signal}).`,
@@ -160,6 +145,7 @@ async function run(): Promise<void> {
         evaluation,
         process.env.GITHUB_RUN_ID,
         config.reviewHintPolicy,
+        config.passWithoutLgtm,
       );
       for (const line of output.logLines) {
         core.info(line);
@@ -170,6 +156,7 @@ async function run(): Promise<void> {
         "failure",
         "unresolved-threads",
         config.reviewHintPolicy,
+        config.passWithoutLgtm,
       );
       core.setFailed(output.annotation);
       return;
@@ -181,15 +168,54 @@ async function run(): Promise<void> {
           `Terminal signal found; waiting ${config.terminalSettleSeconds - settledSeconds}s for review threads to settle.`,
         );
       } else {
-        await publishResult(snapshot, evaluation, "success", "ready", config.reviewHintPolicy);
+        await publishResult(
+          snapshot,
+          evaluation,
+          "success",
+          "ready",
+          config.reviewHintPolicy,
+          config.passWithoutLgtm,
+        );
         return;
       }
     } else {
       terminalSeenAt = null;
     }
 
-    if (evaluation.phase !== "terminal" && !livenessSeen && elapsedSeconds >= config.graceSeconds) {
-      await publishResult(snapshot, evaluation, "failure", "review-missing", config.reviewHintPolicy);
+    if (evaluation.phase === "awaiting-lgtm" && elapsedSeconds >= config.graceSeconds) {
+      await publishResult(
+        snapshot,
+        evaluation,
+        "failure",
+        "lgtm-missing",
+        config.reviewHintPolicy,
+        config.passWithoutLgtm,
+      );
+      core.setFailed(
+        failureOutput(
+          "lgtm-missing",
+          snapshot,
+          evaluation,
+          process.env.GITHUB_RUN_ID,
+          config.reviewHintPolicy,
+          config.passWithoutLgtm,
+        ).annotation,
+      );
+      return;
+    }
+    if (
+      (evaluation.phase === "missing" || evaluation.phase === "reviewing") &&
+      !livenessSeen &&
+      elapsedSeconds >= config.graceSeconds
+    ) {
+      await publishResult(
+        snapshot,
+        evaluation,
+        "failure",
+        "review-missing",
+        config.reviewHintPolicy,
+        config.passWithoutLgtm,
+      );
       core.setFailed(
         failureOutput(
           "review-missing",
@@ -197,16 +223,24 @@ async function run(): Promise<void> {
           evaluation,
           process.env.GITHUB_RUN_ID,
           config.reviewHintPolicy,
+          config.passWithoutLgtm,
         ).annotation,
       );
       return;
     }
     if (
-      evaluation.phase !== "terminal" &&
+      (evaluation.phase === "missing" || evaluation.phase === "reviewing") &&
       livenessSeen &&
       elapsedSeconds >= config.reviewTimeoutSeconds
     ) {
-      await publishResult(snapshot, evaluation, "failure", "review-timeout", config.reviewHintPolicy);
+      await publishResult(
+        snapshot,
+        evaluation,
+        "failure",
+        "review-timeout",
+        config.reviewHintPolicy,
+        config.passWithoutLgtm,
+      );
       core.setFailed(
         failureOutput(
           "review-timeout",
@@ -214,6 +248,7 @@ async function run(): Promise<void> {
           evaluation,
           process.env.GITHUB_RUN_ID,
           config.reviewHintPolicy,
+          config.passWithoutLgtm,
         ).annotation,
       );
       return;

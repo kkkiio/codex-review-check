@@ -1,10 +1,8 @@
 import type {
   IssueCommentRecord,
   IssueCommentSignal,
-  OutdatedPolicy,
   ReviewEvaluation,
   ReviewSnapshot,
-  StalePolicy,
 } from "./types.js";
 
 export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommentSignal {
@@ -57,8 +55,7 @@ export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommen
 export function evaluateReviewState(
   snapshot: ReviewSnapshot,
   botLogins: ReadonlySet<string>,
-  outdatedPolicy: OutdatedPolicy,
-  stalePolicy: StalePolicy,
+  passWithoutLgtm: boolean,
 ): ReviewEvaluation {
   const normalizedBots = new Set(
     [...botLogins].map((login) => login.trim().toLowerCase().replace(/\[bot\]$/u, "")),
@@ -73,33 +70,48 @@ export function evaluateReviewState(
     ...snapshot.reactions,
     ...snapshot.issueComments.flatMap((comment) => comment.reactions),
   ];
-
   const terminalStates = new Set(["COMMENTED", "APPROVED", "CHANGES_REQUESTED"]);
   const botTerminalReviews = snapshot.reviews.filter(
     (review) => isBot(review.author) && terminalStates.has(review.state.toUpperCase()),
   );
-  const headTerminalReview = botTerminalReviews.find(
-    (review) => review.commitId.toLowerCase() === currentHead,
+  const latestByDate = <T>(records: T[], getDate: (record: T) => string | null): T | undefined => {
+    let latest: T | undefined;
+    let latestTime = Number.NEGATIVE_INFINITY;
+    for (const record of records) {
+      const time = getDate(record) ? Date.parse(getDate(record) as string) : Number.NEGATIVE_INFINITY;
+      if (latest === undefined || time >= latestTime) {
+        latest = record;
+        latestTime = time;
+      }
+    }
+    return latest;
+  };
+  const headTerminalReview = latestByDate(
+    botTerminalReviews.filter((review) => review.commitId.toLowerCase() === currentHead),
+    (review) => review.submittedAt,
   );
-  const terminalReview =
-    stalePolicy === "ignore"
-      ? (headTerminalReview ?? botTerminalReviews[botTerminalReviews.length - 1])
-      : headTerminalReview;
+  const terminalReview = passWithoutLgtm
+    ? latestByDate(botTerminalReviews, (review) => review.submittedAt)
+    : headTerminalReview;
 
   const botCleanSignals = snapshot.issueComments
     .filter((comment) => isBot(comment.author))
-    .map((comment) => parseCodexIssueComment(comment))
+    .map((comment) => ({ comment, signal: parseCodexIssueComment(comment) }))
     .filter(
-      (signal): signal is Extract<IssueCommentSignal, { kind: "terminal" }> =>
-        signal.kind === "terminal",
+      (entry): entry is {
+        comment: IssueCommentRecord;
+        signal: Extract<IssueCommentSignal, { kind: "terminal" }>;
+      } => entry.signal.kind === "terminal",
     );
-  const headCleanSignal = botCleanSignals.find(
-    (signal) => signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef),
+  const headCleanSignal = latestByDate(
+    botCleanSignals.filter(
+      ({ signal }) => signal.commitRef === currentHead || currentHead.startsWith(signal.commitRef),
+    ),
+    ({ comment }) => comment.createdAt,
   );
-  const cleanSignal =
-    stalePolicy === "ignore"
-      ? (headCleanSignal ?? botCleanSignals[botCleanSignals.length - 1])
-      : headCleanSignal;
+  const cleanSignal = passWithoutLgtm
+    ? latestByDate(botCleanSignals, ({ comment }) => comment.createdAt)
+    : headCleanSignal;
 
   const botCleanReactions = observedReactions.filter(
     (reaction) =>
@@ -107,14 +119,14 @@ export function evaluateReviewState(
   );
   const isFresh = (record: { createdAt: string | null }) =>
     (record.createdAt ? Date.parse(record.createdAt) : Number.NEGATIVE_INFINITY) >= headCommittedAt;
-  const headCleanReaction = botCleanReactions.find(isFresh);
-  const cleanReaction =
-    stalePolicy === "ignore"
-      ? (headCleanReaction ?? botCleanReactions[0])
-      : headCleanReaction;
+  const headCleanReaction = latestByDate(botCleanReactions.filter(isFresh), (reaction) => reaction.createdAt);
+  const cleanReaction = passWithoutLgtm
+    ? latestByDate(botCleanReactions, (reaction) => reaction.createdAt)
+    : headCleanReaction;
 
-  const currentHeadAttested = Boolean(headTerminalReview ?? headCleanSignal ?? headCleanReaction);
-  const currentHeadTerminal = Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
+  const currentHeadTerminal = passWithoutLgtm
+    ? Boolean(terminalReview ?? cleanSignal ?? cleanReaction)
+    : Boolean(headCleanSignal ?? headCleanReaction);
 
   const progressComment = snapshot.issueComments.find((comment) => {
     if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
@@ -130,33 +142,42 @@ export function evaluateReviewState(
   });
   const currentHeadLiveness = Boolean(progressComment ?? eyesReaction);
 
-  const unresolvedThreads = snapshot.threads.filter((thread) => {
-    if (thread.isResolved || (outdatedPolicy === "ignore" && thread.isOutdated)) {
-      return false;
-    }
-    return thread.comments.some((comment) => isBot(comment.author));
-  });
+  const unresolvedThreads = snapshot.threads.filter(
+    (thread) =>
+      !thread.isResolved && thread.comments.some((comment) => isBot(comment.author)),
+  );
   if (unresolvedThreads.length > 0) {
     return {
       phase: "blocked",
       signal: "unresolved-threads",
       unresolvedThreads,
       currentHeadTerminal,
-      currentHeadAttested,
       currentHeadLiveness,
     };
   }
-  if (terminalReview || cleanSignal || cleanReaction) {
+  if (currentHeadTerminal) {
     return {
       phase: "terminal",
-      signal: terminalReview
-        ? `review:${terminalReview.state.toLowerCase()}`
-        : cleanSignal
+      signal: passWithoutLgtm
+        ? terminalReview
+          ? `review:${terminalReview.state.toLowerCase()}`
+          : cleanSignal
+            ? "clean-comment"
+            : "clean-reaction"
+        : headCleanSignal
           ? "clean-comment"
           : "clean-reaction",
       unresolvedThreads,
       currentHeadTerminal: true,
-      currentHeadAttested,
+      currentHeadLiveness,
+    };
+  }
+  if (!passWithoutLgtm && headTerminalReview) {
+    return {
+      phase: "awaiting-lgtm",
+      signal: `review:${headTerminalReview.state.toLowerCase()}`,
+      unresolvedThreads,
+      currentHeadTerminal: false,
       currentHeadLiveness,
     };
   }
@@ -167,7 +188,6 @@ export function evaluateReviewState(
       signal: progressComment ? "progress-comment" : "eyes",
       unresolvedThreads,
       currentHeadTerminal: false,
-      currentHeadAttested,
       currentHeadLiveness: true,
     };
   }
@@ -177,7 +197,6 @@ export function evaluateReviewState(
     signal: "none",
     unresolvedThreads,
     currentHeadTerminal: false,
-    currentHeadAttested,
     currentHeadLiveness: false,
   };
 }

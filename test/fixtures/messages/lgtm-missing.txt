@@ -1,0 +1,30 @@
+=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
+Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment). Request a fresh review after handling its threads: gh pr comment 42 --body '@codex review' — then re-run: gh run rerun 33499862152 --failed. Or set pass-without-lgtm: true to accept a completed review without an LGTM.
+
+=== job log lines (core.info) ===
+Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).
+
+=== job summary (web UI only) ===
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | review:commented |
+
+## LGTM missing
+
+Codex reviewed the current HEAD `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).
+
+Request a fresh review after handling its threads:
+
+```shell
+gh pr comment 42 --body '@codex review'
+```
+
+Then re-run the failed check:
+
+```shell
+gh run rerun 33499862152 --failed
+```
+
+Or set `pass-without-lgtm: true` to accept a completed review without an LGTM.

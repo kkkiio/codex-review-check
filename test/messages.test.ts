@@ -76,8 +76,16 @@ function composite(
   reason: FailureReason,
   evaluation: ReviewEvaluation,
   reviewHint: ReviewHintPolicy,
+  passWithoutLgtm = false,
 ): string {
-  const output = failureOutput(reason, snapshot, evaluation, RUN_ID, reviewHint);
+  const output = failureOutput(
+    reason,
+    snapshot,
+    evaluation,
+    RUN_ID,
+    reviewHint,
+    passWithoutLgtm,
+  );
   return [
     "=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===",
     output.annotation,
@@ -86,184 +94,175 @@ function composite(
     ...(output.logLines.length > 0 ? output.logLines : ["(none)"]),
     "",
     "=== job summary (web UI only) ===",
-    summaryMarkdown(snapshot, evaluation, "failure", reason, RUN_ID, reviewHint),
+    summaryMarkdown(
+      snapshot,
+      evaluation,
+      "failure",
+      reason,
+      RUN_ID,
+      reviewHint,
+      passWithoutLgtm,
+    ),
   ].join("\n");
 }
 
-test("unresolved-threads, current HEAD already reviewed", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "blocked",
-    signal: "unresolved-threads",
-    unresolvedThreads: blockingThreads,
-    currentHeadTerminal: true,
-    currentHeadAttested: true,
+function evaluation(overrides: Partial<ReviewEvaluation>): ReviewEvaluation {
+  return {
+    phase: "missing",
+    signal: "none",
+    unresolvedThreads: [],
+    currentHeadTerminal: false,
     currentHeadLiveness: false,
+    ...overrides,
   };
-  expectFixture("unresolved-threads", composite("unresolved-threads", evaluation, "suggest"));
+}
+
+test("unresolved-threads, current HEAD already satisfies the pass condition", () => {
+  expectFixture(
+    "unresolved-threads",
+    composite(
+      "unresolved-threads",
+      evaluation({
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+        currentHeadTerminal: true,
+      }),
+      "suggest",
+    ),
+  );
 });
 
 test("unresolved-threads, HEAD needs a review, hint suggested", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "blocked",
-    signal: "unresolved-threads",
-    unresolvedThreads: blockingThreads,
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
   expectFixture(
     "unresolved-threads-needs-review",
-    composite("unresolved-threads", evaluation, "suggest"),
+    composite(
+      "unresolved-threads",
+      evaluation({
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+      }),
+      "suggest",
+    ),
   );
 });
 
 test("unresolved-threads, HEAD needs a review, hint suppressed", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "blocked",
-    signal: "unresolved-threads",
-    unresolvedThreads: blockingThreads,
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
   expectFixture(
     "unresolved-threads-auto-review",
-    composite("unresolved-threads", evaluation, "suppress"),
+    composite(
+      "unresolved-threads",
+      evaluation({
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+      }),
+      "suppress",
+    ),
   );
 });
 
 test("review-missing, hint suggested", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "missing",
-    signal: "none",
-    unresolvedThreads: [],
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
-  expectFixture("review-missing", composite("review-missing", evaluation, "suggest"));
+  expectFixture("review-missing", composite("review-missing", evaluation({}), "suggest"));
 });
 
 test("review-missing, hint suppressed", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "missing",
-    signal: "none",
-    unresolvedThreads: [],
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
-  expectFixture("review-missing-auto-review", composite("review-missing", evaluation, "suppress"));
+  expectFixture("review-missing-auto-review", composite("review-missing", evaluation({}), "suppress"));
 });
 
 test("review-timeout failure output", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "reviewing",
-    signal: "progress-comment",
-    unresolvedThreads: [],
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
-  expectFixture("review-timeout", composite("review-timeout", evaluation, "suggest"));
-});
-
-test("unresolved-threads, review already in progress", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "blocked",
-    signal: "unresolved-threads",
-    unresolvedThreads: blockingThreads,
-    currentHeadTerminal: false,
-    currentHeadAttested: false,
-    currentHeadLiveness: true,
-  };
   expectFixture(
-    "unresolved-threads-review-in-progress",
-    composite("unresolved-threads", evaluation, "suggest"),
+    "review-timeout",
+    composite(
+      "review-timeout",
+      evaluation({ phase: "reviewing", signal: "progress-comment" }),
+      "suggest",
+    ),
   );
 });
 
-test("ready accepted under stale-reviews ignore", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "terminal",
-    signal: "review:commented",
-    unresolvedThreads: [],
-    currentHeadTerminal: true,
-    currentHeadAttested: false,
-    currentHeadLiveness: false,
-  };
-  expectFixture("ready-stale", summaryMarkdown(snapshot, evaluation, "success", "ready", RUN_ID, "suggest"));
+test("unresolved-threads, review already in progress", () => {
+  expectFixture(
+    "unresolved-threads-review-in-progress",
+    composite(
+      "unresolved-threads",
+      evaluation({
+        phase: "blocked",
+        signal: "unresolved-threads",
+        unresolvedThreads: blockingThreads,
+        currentHeadLiveness: true,
+      }),
+      "suggest",
+    ),
+  );
 });
 
-test("ready success summary", () => {
-  const evaluation: ReviewEvaluation = {
-    phase: "terminal",
-    signal: "review:approved",
-    unresolvedThreads: [],
-    currentHeadTerminal: true,
-    currentHeadAttested: true,
-    currentHeadLiveness: false,
-  };
+test("lgtm-missing, hint suggested", () => {
+  expectFixture(
+    "lgtm-missing",
+    composite(
+      "lgtm-missing",
+      evaluation({ phase: "awaiting-lgtm", signal: "review:commented" }),
+      "suggest",
+    ),
+  );
+});
+
+test("lgtm-missing, hint suppressed", () => {
+  expectFixture(
+    "lgtm-missing-auto-review",
+    composite(
+      "lgtm-missing",
+      evaluation({ phase: "awaiting-lgtm", signal: "review:commented" }),
+      "suppress",
+    ),
+  );
+});
+
+test("ready accepted without an LGTM under pass-without-lgtm", () => {
+  const ready = summaryMarkdown(
+    snapshot,
+    evaluation({ phase: "terminal", signal: "review:commented", currentHeadTerminal: true }),
+    "success",
+    "ready",
+    RUN_ID,
+    "suggest",
+    true,
+  );
+  expectFixture("ready-without-lgtm", ready);
+});
+
+test("ready strict success summary", () => {
   expectFixture(
     "ready",
-    summaryMarkdown(snapshot, evaluation, "success", "ready", RUN_ID, "suggest"),
+    summaryMarkdown(
+      snapshot,
+      evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
+      "success",
+      "ready",
+      RUN_ID,
+      "suggest",
+      false,
+    ),
   );
 });
 
 test("review-hint output matches the annotation guidance", () => {
   const scenarios: [FailureReason, ReviewEvaluation][] = [
-    [
-      "unresolved-threads",
-      {
-        phase: "blocked",
-        signal: "unresolved-threads",
-        unresolvedThreads: blockingThreads,
-        currentHeadTerminal: false,
-        currentHeadAttested: false,
-        currentHeadLiveness: false,
-      },
-    ],
-    [
-      "unresolved-threads",
-      {
-        phase: "blocked",
-        signal: "unresolved-threads",
-        unresolvedThreads: blockingThreads,
-        currentHeadTerminal: false,
-        currentHeadAttested: false,
-        currentHeadLiveness: true,
-      },
-    ],
-    [
-      "unresolved-threads",
-      {
-        phase: "blocked",
-        signal: "unresolved-threads",
-        unresolvedThreads: blockingThreads,
-        currentHeadTerminal: true,
-        currentHeadAttested: true,
-        currentHeadLiveness: false,
-      },
-    ],
-    [
-      "review-missing",
-      {
-        phase: "missing",
-        signal: "none",
-        unresolvedThreads: [],
-        currentHeadTerminal: false,
-        currentHeadAttested: false,
-        currentHeadLiveness: false,
-      },
-    ],
+    ["unresolved-threads", evaluation({ unresolvedThreads: blockingThreads })],
+    ["unresolved-threads", evaluation({ unresolvedThreads: blockingThreads, currentHeadLiveness: true })],
+    ["unresolved-threads", evaluation({ unresolvedThreads: blockingThreads, currentHeadTerminal: true })],
+    ["review-missing", evaluation({})],
+    ["lgtm-missing", evaluation({ phase: "awaiting-lgtm", signal: "review:commented" })],
   ];
-  for (const [reason, evaluation] of scenarios) {
+  for (const [reason, state] of scenarios) {
     for (const policy of ["suggest", "suppress"] as const) {
-      const output = failureOutput(reason, snapshot, evaluation, RUN_ID, policy);
+      const output = failureOutput(reason, snapshot, state, RUN_ID, policy);
       assert.equal(
-        suggestsReviewRequest(reason, evaluation, policy),
+        suggestsReviewRequest(reason, state, policy),
         output.annotation.includes("'@codex review'"),
-        `${reason} terminal=${evaluation.currentHeadTerminal} liveness=${evaluation.currentHeadLiveness} policy=${policy}`,
+        `${reason} terminal=${state.currentHeadTerminal} liveness=${state.currentHeadLiveness} policy=${policy}`,
       );
     }
   }
