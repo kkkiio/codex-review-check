@@ -65,6 +65,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 
 - When changing `src/`, rebuild and commit `dist/index.js` and `dist/index.js.map` in the same change.
 - When changing the consumer workflow pin, use a reviewed full-length commit SHA; do not replace it with a mutable branch reference.
+- Pin-only updates that advance the dogfood workflow and example to a merged commit may be pushed directly to `main` without a pull request.
 - When changing review orchestration, keep the Action read-only: never post `@codex review`, resolve conversations, or mutate pull request state.
 - When adding TypeScript abstractions, prefer deep cohesive functions over chains of thin one-use helpers; keep substantial functions long enough to own a complete responsibility.
 - When tools format generated or source files, preserve the formatter's changes. Do not run `git diff --check` as a project verification step.
