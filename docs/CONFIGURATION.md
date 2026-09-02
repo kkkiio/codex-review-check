@@ -12,7 +12,7 @@ Codex Review Check reads live pull request state on every attempt. The complete 
 | `grace-seconds` | no | `60` | Wait before a missing-review hint fails |
 | `review-timeout-seconds` | no | `1800` | Maximum wait after review liveness appears |
 | `poll-interval-seconds` | no | `10` | Delay between live GitHub state reads |
-| `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence |
+| `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence, before both success and missing-LGTM failures |
 | `pass-without-lgtm` | no | `false` | Pass a completed review without a current-HEAD LGTM; `true` is the explicit lenient opt-out |
 | `review-hint` | no | `suggest` | Either `suggest` or `suppress` the manual `@codex review` request hint |
 
@@ -47,6 +47,7 @@ The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHU
 - Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
 - In the default strict mode, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
 - A terminal review with `COMMENTED`, `CHANGES_REQUESTED`, or `APPROVED` state is not an LGTM, even when it has no findings.
+- A completed review awaiting an LGTM yields to a follow-up review in progress: liveness newer than that review's submission keeps the job waiting up to `review-timeout-seconds` instead of failing `lgtm-missing`. Liveness left over from the completed review itself does not.
 - In lenient mode, a completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, but unresolved threads still block.
 - Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
 

@@ -173,13 +173,20 @@ export function evaluateReviewState(
     };
   }
   if (!passWithoutLgtm && headTerminalReview) {
-    return {
-      phase: "awaiting-lgtm",
-      signal: `review:${headTerminalReview.state.toLowerCase()}`,
-      unresolvedThreads,
-      currentHeadTerminal: false,
-      currentHeadLiveness,
-    };
+    const reviewedAt = Date.parse(headTerminalReview.submittedAt ?? "");
+    const followUpLiveness = [progressComment, eyesReaction].some((record) => {
+      const createdAt = record?.createdAt;
+      return createdAt != null && Date.parse(createdAt) > reviewedAt;
+    });
+    if (!followUpLiveness) {
+      return {
+        phase: "awaiting-lgtm",
+        signal: `review:${headTerminalReview.state.toLowerCase()}`,
+        unresolvedThreads,
+        currentHeadTerminal: false,
+        currentHeadLiveness,
+      };
+    }
   }
 
   if (progressComment || eyesReaction) {

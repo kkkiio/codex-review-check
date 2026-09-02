@@ -15,11 +15,13 @@ interface Fixtures {
   base: ReviewSnapshot;
   eyes: ReactionRecord;
   staleEyes: ReactionRecord;
+  followUpEyes: ReactionRecord;
   cleanReaction: ReactionRecord;
   staleCleanReaction: ReactionRecord;
   cleanComment: IssueCommentRecord;
   mismatchedCleanComment: IssueCommentRecord;
   progressComment: IssueCommentRecord;
+  followUpProgressComment: IssueCommentRecord;
   reviewRequestComment: IssueCommentRecord;
   completedReviewRequestComment: IssueCommentRecord;
   terminalReview: ReviewRecord;
@@ -112,6 +114,32 @@ test("strict mode requires a current-HEAD LGTM", () => {
     issueComments: [fixtures.mismatchedCleanComment],
   });
   assert.equal(mismatchedClean.phase, "missing");
+});
+
+test("strict mode lets follow-up review liveness supersede a completed review", () => {
+  const followUpEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.followUpEyes],
+  });
+  assert.equal(followUpEyes.phase, "reviewing");
+  assert.equal(followUpEyes.signal, "eyes");
+
+  const followUpProgress = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.followUpProgressComment],
+  });
+  assert.equal(followUpProgress.phase, "reviewing");
+  assert.equal(followUpProgress.signal, "progress-comment");
+
+  const leftoverEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.eyes],
+  });
+  assert.equal(leftoverEyes.phase, "awaiting-lgtm");
+  assert.equal(leftoverEyes.signal, "review:commented");
 });
 
 test("lenient mode accepts stale terminal evidence of any supported kind", () => {

@@ -20,6 +20,11 @@
     "content": "eyes",
     "createdAt": "2026-08-31T09:59:59Z"
   },
+  "followUpEyes": {
+    "author": "chatgpt-codex-connector[bot]",
+    "content": "eyes",
+    "createdAt": "2026-08-31T10:02:30Z"
+  },
   "cleanReaction": {
     "author": "chatgpt-codex-connector[bot]",
     "content": "+1",
@@ -55,6 +60,15 @@
     "body": "👀 Codex Review still in progress: analyzing tests",
     "createdAt": "2026-08-31T10:00:10Z",
     "url": "https://github.com/example/project/pull/42#issuecomment-3",
+    "reactions": []
+  },
+  "followUpProgressComment": {
+    "author": "chatgpt-codex-connector",
+    "authorType": "Bot",
+    "appSlug": "chatgpt-codex-connector",
+    "body": "👀 Codex Review still in progress: re-checking fixes",
+    "createdAt": "2026-08-31T10:02:45Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-6",
     "reactions": []
   },
   "reviewRequestComment": {

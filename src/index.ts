@@ -178,30 +178,40 @@ async function run(): Promise<void> {
         );
         return;
       }
+    } else if (evaluation.phase === "awaiting-lgtm") {
+      terminalSeenAt ??= Date.now();
     } else {
       terminalSeenAt = null;
     }
 
     if (evaluation.phase === "awaiting-lgtm" && elapsedSeconds >= config.graceSeconds) {
-      await publishResult(
-        snapshot,
-        evaluation,
-        "failure",
-        "lgtm-missing",
-        config.reviewHintPolicy,
-        config.passWithoutLgtm,
-      );
-      core.setFailed(
-        failureOutput(
-          "lgtm-missing",
+      const settledSeconds =
+        terminalSeenAt === null ? 0 : Math.floor((Date.now() - terminalSeenAt) / 1000);
+      if (settledSeconds < config.terminalSettleSeconds) {
+        core.info(
+          `Terminal review found; waiting ${config.terminalSettleSeconds - settledSeconds}s for review threads to settle before reporting a missing LGTM.`,
+        );
+      } else {
+        await publishResult(
           snapshot,
           evaluation,
-          process.env.GITHUB_RUN_ID,
+          "failure",
+          "lgtm-missing",
           config.reviewHintPolicy,
           config.passWithoutLgtm,
-        ).annotation,
-      );
-      return;
+        );
+        core.setFailed(
+          failureOutput(
+            "lgtm-missing",
+            snapshot,
+            evaluation,
+            process.env.GITHUB_RUN_ID,
+            config.reviewHintPolicy,
+            config.passWithoutLgtm,
+          ).annotation,
+        );
+        return;
+      }
     }
     if (
       (evaluation.phase === "missing" || evaluation.phase === "reviewing") &&
