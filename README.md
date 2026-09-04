@@ -43,7 +43,7 @@ flowchart TB
     A([Run / rerun]) --> B{1 · threads}
     B -- unresolved --> C[Fail · fix, or reply with reasoning and resolve]
     C --> A
-    B -- clear --> D{2 · liveness}
+    B -- clear --> D{2 · new liveness}
     D -- "👀 / progress" --> E[Wait for the verdict]
     E --> A
     E -- "5 · review-timeout" --> J[Fail · review never finished]
@@ -53,7 +53,7 @@ flowchart TB
     G --> A
     F -- "lenient · any HEAD" --> H([Pass])
     F -- "strict · LGTM" --> H
-    F -- "strict · no LGTM" --> I[Fail · re-review hint]
+    F -- "strict · no LGTM" --> I[Fail · re-review hint · after grace + settle]
     I --> A
     classDef pass fill:#dafbe1,stroke:#1a7f37
     classDef fail fill:#ffebe9,stroke:#cf222e
@@ -68,7 +68,7 @@ And its evaluation order — each evaluation stops at the first match:
 2 · a newer review is running   → wait (👀 / progress comment)
 3 · completed verdict           → pass
       lenient (default):  latest verdict, any HEAD
-      require-lgtm:       LGTM on the current HEAD — a verdict without an LGTM fails with a re-review hint
+      require-lgtm:       LGTM on the current HEAD — a verdict without an LGTM fails with a re-review hint after grace + settle
 4 · nothing after grace-seconds → fail · @codex review hint
 5 · review never finishes       → fail at review-timeout-seconds
 ```
