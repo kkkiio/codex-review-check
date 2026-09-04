@@ -76,7 +76,7 @@ function composite(
   reason: FailureReason,
   evaluation: ReviewEvaluation,
   reviewHint: ReviewHintPolicy,
-  passWithoutLgtm = false,
+  requireLgtm = false,
 ): string {
   const output = failureOutput(
     reason,
@@ -84,7 +84,7 @@ function composite(
     evaluation,
     RUN_ID,
     reviewHint,
-    passWithoutLgtm,
+    requireLgtm,
   );
   return [
     "=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===",
@@ -101,7 +101,7 @@ function composite(
       reason,
       RUN_ID,
       reviewHint,
-      passWithoutLgtm,
+      requireLgtm,
     ),
   ].join("\n");
 }
@@ -113,6 +113,7 @@ function evaluation(overrides: Partial<ReviewEvaluation>): ReviewEvaluation {
     unresolvedThreads: [],
     currentHeadTerminal: false,
     currentHeadLiveness: false,
+    terminalAt: null,
     ...overrides,
   };
 }
@@ -220,7 +221,7 @@ test("lgtm-missing, hint suppressed", () => {
   );
 });
 
-test("ready accepted without an LGTM under pass-without-lgtm", () => {
+test("ready lenient success summary is the default", () => {
   const ready = summaryMarkdown(
     snapshot,
     evaluation({ phase: "terminal", signal: "review:commented", currentHeadTerminal: true }),
@@ -228,14 +229,13 @@ test("ready accepted without an LGTM under pass-without-lgtm", () => {
     "ready",
     RUN_ID,
     "suggest",
-    true,
   );
-  expectFixture("ready-without-lgtm", ready);
+  expectFixture("ready", ready);
 });
 
-test("ready strict success summary", () => {
+test("ready lenient success summary reports an observed LGTM", () => {
   expectFixture(
-    "ready",
+    "ready-lenient-lgtm",
     summaryMarkdown(
       snapshot,
       evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
@@ -243,7 +243,21 @@ test("ready strict success summary", () => {
       "ready",
       RUN_ID,
       "suggest",
-      false,
+    ),
+  );
+});
+
+test("ready strict success summary", () => {
+  expectFixture(
+    "ready-require-lgtm",
+    summaryMarkdown(
+      snapshot,
+      evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
+      "success",
+      "ready",
+      RUN_ID,
+      "suggest",
+      true,
     ),
   );
 });

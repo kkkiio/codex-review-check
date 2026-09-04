@@ -1,9 +1,0 @@
-# Codex Review
-
-| Pull request | HEAD | State | Signal |
-| --- | --- | --- | --- |
-| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | review:commented |
-
-## Ready
-
-Codex completed a review and it was accepted without an LGTM under `pass-without-lgtm`. No unresolved Codex review thread blocks.

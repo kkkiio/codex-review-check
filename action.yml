@@ -1,5 +1,5 @@
 name: Codex Review Check
-description: Wait for a current-head Codex LGTM and block unresolved Codex review threads without requesting a review automatically.
+description: Block unresolved Codex review threads and optionally require a current-HEAD Codex LGTM, without requesting a review automatically.
 author: xieziheng
 
 branding:
@@ -34,8 +34,8 @@ inputs:
     description: Seconds to let review threads propagate after a terminal review signal appears.
     required: false
     default: '15'
-  pass-without-lgtm:
-    description: Pass when Codex completed a review without leaving an LGTM (a 👍 reaction or a 'Didn't find any major issues' comment) on the current HEAD. Default false requires that LGTM.
+  require-lgtm:
+    description: Require an LGTM (a 👍 reaction or a 'Didn't find any major issues' comment) attesting the current HEAD. Default false accepts the most recent completed Codex review once its threads are resolved.
     required: false
     default: 'false'
   review-hint:

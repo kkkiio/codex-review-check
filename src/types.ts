@@ -69,4 +69,6 @@ export interface ReviewEvaluation {
   currentHeadTerminal: boolean;
   /** True when a fresh 👀 or progress comment shows a review of the current HEAD is running. */
   currentHeadLiveness: boolean;
+  /** Epoch milliseconds of the selected terminal artifact; null outside the terminal phase. */
+  terminalAt: number | null;
 }

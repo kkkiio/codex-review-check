@@ -19,7 +19,7 @@ interface RuntimeConfig {
   reviewTimeoutSeconds: number;
   pollIntervalSeconds: number;
   terminalSettleSeconds: number;
-  passWithoutLgtm: boolean;
+  requireLgtm: boolean;
   reviewHintPolicy: ReviewHintPolicy;
 }
 
@@ -29,7 +29,7 @@ async function publishResult(
   state: "success" | "failure",
   reason: string,
   reviewHintPolicy: ReviewHintPolicy,
-  passWithoutLgtm: boolean,
+  requireLgtm: boolean,
 ): Promise<void> {
   core.setOutput("state", state);
   core.setOutput("reason", reason);
@@ -49,7 +49,7 @@ async function publishResult(
       reason,
       process.env.GITHUB_RUN_ID,
       reviewHintPolicy,
-      passWithoutLgtm,
+      requireLgtm,
     ),
   );
   await core.summary.write();
@@ -85,9 +85,9 @@ async function run(): Promise<void> {
   if (integerInputs.pollIntervalSeconds === 0) {
     throw new Error("poll-interval-seconds must be greater than zero.");
   }
-  const passWithoutLgtmInput = core.getInput("pass-without-lgtm").trim().toLowerCase();
-  if (passWithoutLgtmInput !== "true" && passWithoutLgtmInput !== "false") {
-    throw new Error("pass-without-lgtm must be exactly true or false.");
+  const requireLgtmInput = core.getInput("require-lgtm").trim().toLowerCase();
+  if (requireLgtmInput !== "true" && requireLgtmInput !== "false") {
+    throw new Error("require-lgtm must be exactly true or false.");
   }
   const reviewHintInput = core.getInput("review-hint").trim().toLowerCase();
   if (reviewHintInput !== "suggest" && reviewHintInput !== "suppress") {
@@ -106,7 +106,7 @@ async function run(): Promise<void> {
         .filter(Boolean),
     ),
     ...integerInputs,
-    passWithoutLgtm: passWithoutLgtmInput === "true",
+    requireLgtm: requireLgtmInput === "true",
     reviewHintPolicy: reviewHintInput,
   };
   if (config.botLogins.size === 0) {
@@ -117,6 +117,7 @@ async function run(): Promise<void> {
   let observedHeadSha = "";
   let livenessSeen = false;
   let terminalSeenAt: number | null = null;
+  let terminalEvidenceAt: number | null = null;
   let lastPhase = "";
   while (true) {
     const snapshot = await loadReviewSnapshot(config.token, config.repository, config.pullRequest);
@@ -125,10 +126,11 @@ async function run(): Promise<void> {
       headStartedAt = Date.now();
       livenessSeen = false;
       terminalSeenAt = null;
+      terminalEvidenceAt = null;
       lastPhase = "";
       core.info(`Evaluating live pull request HEAD ${observedHeadSha}.`);
     }
-    const evaluation = evaluateReviewState(snapshot, config.botLogins, config.passWithoutLgtm);
+    const evaluation = evaluateReviewState(snapshot, config.botLogins, config.requireLgtm);
     const elapsedSeconds = Math.floor((Date.now() - headStartedAt) / 1000);
     livenessSeen ||= evaluation.phase === "reviewing";
     if (evaluation.phase !== lastPhase) {
@@ -145,7 +147,7 @@ async function run(): Promise<void> {
         evaluation,
         process.env.GITHUB_RUN_ID,
         config.reviewHintPolicy,
-        config.passWithoutLgtm,
+        config.requireLgtm,
       );
       for (const line of output.logLines) {
         core.info(line);
@@ -156,11 +158,18 @@ async function run(): Promise<void> {
         "failure",
         "unresolved-threads",
         config.reviewHintPolicy,
-        config.passWithoutLgtm,
+        config.requireLgtm,
       );
       core.setFailed(output.annotation);
       return;
     } else if (evaluation.phase === "terminal") {
+      // A newer verdict needs its own settle window: its review threads may
+      // still be propagating even though the phase stayed terminal.
+      if (evaluation.terminalAt !== terminalEvidenceAt) {
+        terminalEvidenceAt = evaluation.terminalAt;
+        terminalSeenAt = Date.now();
+        core.info("Accepted terminal verdict changed; restarting the settle window.");
+      }
       terminalSeenAt ??= Date.now();
       const settledSeconds = Math.floor((Date.now() - terminalSeenAt) / 1000);
       if (settledSeconds < config.terminalSettleSeconds) {
@@ -174,14 +183,22 @@ async function run(): Promise<void> {
           "success",
           "ready",
           config.reviewHintPolicy,
-          config.passWithoutLgtm,
+          config.requireLgtm,
         );
         return;
       }
     } else if (evaluation.phase === "awaiting-lgtm") {
+      // Same settle-window rule as the terminal phase: a newer same-HEAD
+      // review gets its own propagation window before lgtm-missing fires.
+      if (evaluation.terminalAt !== terminalEvidenceAt) {
+        terminalEvidenceAt = evaluation.terminalAt;
+        terminalSeenAt = Date.now();
+        core.info("Accepted terminal verdict changed; restarting the settle window.");
+      }
       terminalSeenAt ??= Date.now();
     } else {
       terminalSeenAt = null;
+      terminalEvidenceAt = null;
     }
 
     if (evaluation.phase === "awaiting-lgtm" && elapsedSeconds >= config.graceSeconds) {
@@ -198,7 +215,7 @@ async function run(): Promise<void> {
           "failure",
           "lgtm-missing",
           config.reviewHintPolicy,
-          config.passWithoutLgtm,
+          config.requireLgtm,
         );
         core.setFailed(
           failureOutput(
@@ -207,7 +224,7 @@ async function run(): Promise<void> {
             evaluation,
             process.env.GITHUB_RUN_ID,
             config.reviewHintPolicy,
-            config.passWithoutLgtm,
+            config.requireLgtm,
           ).annotation,
         );
         return;
@@ -224,7 +241,7 @@ async function run(): Promise<void> {
         "failure",
         "review-missing",
         config.reviewHintPolicy,
-        config.passWithoutLgtm,
+        config.requireLgtm,
       );
       core.setFailed(
         failureOutput(
@@ -233,7 +250,7 @@ async function run(): Promise<void> {
           evaluation,
           process.env.GITHUB_RUN_ID,
           config.reviewHintPolicy,
-          config.passWithoutLgtm,
+          config.requireLgtm,
         ).annotation,
       );
       return;
@@ -249,7 +266,7 @@ async function run(): Promise<void> {
         "failure",
         "review-timeout",
         config.reviewHintPolicy,
-        config.passWithoutLgtm,
+        config.requireLgtm,
       );
       core.setFailed(
         failureOutput(
@@ -258,7 +275,7 @@ async function run(): Promise<void> {
           evaluation,
           process.env.GITHUB_RUN_ID,
           config.reviewHintPolicy,
-          config.passWithoutLgtm,
+          config.requireLgtm,
         ).annotation,
       );
       return;

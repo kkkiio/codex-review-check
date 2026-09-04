@@ -1,5 +1,5 @@
 === annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
-Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment). Verify the connector triggered a fresh review after handling its threads, then re-run: gh run rerun 33499862152 --failed. Or set pass-without-lgtm: true to accept a completed review without an LGTM.
+Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment). Verify the connector triggered a fresh review after handling its threads, then re-run: gh run rerun 33499862152 --failed. Or drop require-lgtm to accept a completed review without an LGTM.
 
 === job log lines (core.info) ===
 Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).
@@ -21,4 +21,4 @@ Verify the connector triggered a fresh review after handling its threads, then r
 gh run rerun 33499862152 --failed
 ```
 
-Or set `pass-without-lgtm: true` to accept a completed review without an LGTM.
+Or drop `require-lgtm` to accept a completed review without an LGTM.

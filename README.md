@@ -4,13 +4,13 @@
   <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
 </p>
 
-Codex Review Check is a read-only, credit-aware GitHub Action that guides agents through the Codex review loop: it surfaces known findings first and requires a current-HEAD Codex LGTM by default.
+Codex Review Check is a read-only, credit-aware GitHub Action that guides agents through the Codex review loop: a completed review holds the quality floor by default, and `require-lgtm: true` raises the bar to a current-HEAD Codex LGTM.
 
 ## Installation
 
 Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
 
-Enable Codex code review for the repository with the **On pull request** trigger so each pull request receives an initial review. The Action provides an explicit command when a later HEAD needs another review. Set `pass-without-lgtm: true` when a completed review may pass without a current-HEAD LGTM.
+Enable Codex code review for the repository with the **On pull request** trigger so each pull request receives an initial review. The Action provides an explicit command when a later HEAD needs another review. By default, a completed review may pass without a current-HEAD LGTM; set `require-lgtm: true` for the strict gate.
 
 After its first pull request run, add the `Codex Review` job as a required check in the repository ruleset.
 
@@ -43,9 +43,9 @@ flowchart LR
 
     B -- clear --> D[2 · Check current HEAD review]
 
-    D -- "👍 / clean comment (LGTM)" --> E([Pass])
-    D -- "terminal review with findings" --> I[Resolve each finding]
-    I --> J[Request fresh review for an LGTM, then rerun]
+    D -- "terminal review / 👍 / clean comment" --> E([Pass])
+    D -- "review findings" --> I[Resolve each finding]
+    I --> J[Re-run the check]
     J --> A
 
     D -- "👀 / progress" --> F[Pending · wait]

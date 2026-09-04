@@ -13,7 +13,7 @@ Codex Review Check reads live pull request state on every attempt. The complete 
 | `review-timeout-seconds` | no | `1800` | Maximum wait after review liveness appears |
 | `poll-interval-seconds` | no | `10` | Delay between live GitHub state reads |
 | `terminal-settle-seconds` | no | `15` | Buffer for review-thread propagation after terminal evidence, before both success and missing-LGTM failures |
-| `pass-without-lgtm` | no | `false` | Pass a completed review without a current-HEAD LGTM; `true` is the explicit lenient opt-out |
+| `require-lgtm` | no | `false` | Require an LGTM attesting the current HEAD; `true` opts into the strict gate |
 | `review-hint` | no | `suggest` | Either `suggest` or `suppress` the manual `@codex review` request hint |
 
 The workflow token needs only:
@@ -44,19 +44,18 @@ Keep `cancel-in-progress: true` for the pull-request concurrency group so a new 
 
 The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
 
-- Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
-- In the default strict mode, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
+- A review that started after the latest completed verdict keeps the job waiting in both modes, up to `review-timeout-seconds`: an in-flight review was paid for, so its result must land before the gate opens. Liveness predating the latest completed verdict is a leftover of that review and does not block.
+- In the default lenient mode, the most recent completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, once no unresolved Codex review thread remains.
+- With `require-lgtm: true`, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
 - A terminal review with `COMMENTED`, `CHANGES_REQUESTED`, or `APPROVED` state is not an LGTM, even when it has no findings.
-- A completed review awaiting an LGTM yields to a follow-up review in progress: liveness newer than that review's submission keeps the job waiting up to `review-timeout-seconds` instead of failing `lgtm-missing`. Liveness left over from the completed review itself does not.
-- In lenient mode, a completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, but unresolved threads still block.
 - Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
 
 ## LGTM requirement
 
-`pass-without-lgtm` controls whether a completed review must include Codex's own clean verdict:
+`require-lgtm` controls whether a completed review must include Codex's own clean verdict:
 
-- The default `false` requires an LGTM on the current HEAD. An LGTM is either a 👍 reaction from the configured Codex bot created at or after the HEAD commit, or a bot issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one `Reviewed commit` marker matching the current HEAD.
-- Set `pass-without-lgtm: true` to accept the most recent terminal review, clean comment, or 👍 without requiring an LGTM on the current HEAD. This can be useful for iteration loops where requiring a new clean verdict after every push would not converge.
+- The default `false` is lenient: the most recent terminal review, clean comment, or 👍 can pass once every Codex review thread is resolved, even when the evidence attests an older HEAD.
+- Set `require-lgtm: true` to require an LGTM on the current HEAD. An LGTM is either a 👍 reaction from the configured Codex bot created at or after the HEAD commit, or a bot issue comment beginning `Codex Review: Didn't find any major issues.` with exactly one `Reviewed commit` marker matching the current HEAD.
 - Every unresolved Codex review thread blocks in both modes, including threads GitHub marks outdated. Resolve each finding by fixing it, or reply with your reasoning on the thread and then resolve it; silent resolves are not auditable.
 
 Known blocking threads always take precedence over lifecycle state. After they are handled, strict mode may require a fresh review to obtain an LGTM.

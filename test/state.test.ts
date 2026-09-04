@@ -34,8 +34,8 @@ const fixtures = JSON.parse(
   readFileSync(fileURLToPath(new URL("./fixtures/review-states.json", import.meta.url)), "utf8"),
 ) as Fixtures;
 const bots = new Set(["chatgpt-codex-connector", "chatgpt-codex-connector[bot]"]);
-const evaluate = (snapshot: ReviewSnapshot, passWithoutLgtm = false) =>
-  evaluateReviewState(snapshot, bots, passWithoutLgtm);
+const evaluate = (snapshot: ReviewSnapshot, requireLgtm = false) =>
+  evaluateReviewState(snapshot, bots, requireLgtm);
 
 test("Codex issue comments expose only supported clean and progress signals", () => {
   const clean = parseCodexIssueComment(fixtures.cleanComment);
@@ -68,48 +68,49 @@ test("Codex issue comments expose only supported clean and progress signals", ()
 });
 
 test("strict mode requires a current-HEAD LGTM", () => {
-  assert.equal(evaluate(fixtures.base).phase, "missing");
-  assert.equal(evaluate({ ...fixtures.base, reactions: [fixtures.staleEyes] }).phase, "missing");
+  const strictEvaluate = (snapshot: ReviewSnapshot) => evaluate(snapshot, true);
+  assert.equal(strictEvaluate(fixtures.base).phase, "missing");
+  assert.equal(strictEvaluate({ ...fixtures.base, reactions: [fixtures.staleEyes] }).phase, "missing");
   assert.equal(
-    evaluate({ ...fixtures.base, reactions: [fixtures.staleCleanReaction] }).phase,
+    strictEvaluate({ ...fixtures.base, reactions: [fixtures.staleCleanReaction] }).phase,
     "missing",
   );
 
-  const reviewing = evaluate({ ...fixtures.base, reactions: [fixtures.eyes] });
+  const reviewing = strictEvaluate({ ...fixtures.base, reactions: [fixtures.eyes] });
   assert.equal(reviewing.phase, "reviewing");
   assert.equal(reviewing.signal, "eyes");
 
-  const progress = evaluate({ ...fixtures.base, issueComments: [fixtures.progressComment] });
+  const progress = strictEvaluate({ ...fixtures.base, issueComments: [fixtures.progressComment] });
   assert.equal(progress.phase, "reviewing");
   assert.equal(progress.signal, "progress-comment");
 
-  const withFindings = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
+  const withFindings = strictEvaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
   assert.equal(withFindings.phase, "awaiting-lgtm");
   assert.equal(withFindings.signal, "review:commented");
 
-  const approved = evaluate({
+  const approved = strictEvaluate({
     ...fixtures.base,
     reviews: [{ ...fixtures.terminalReview, state: "APPROVED" }],
   });
   assert.equal(approved.phase, "awaiting-lgtm");
   assert.equal(approved.signal, "review:approved");
 
-  const clean = evaluate({ ...fixtures.base, issueComments: [fixtures.cleanComment] });
+  const clean = strictEvaluate({ ...fixtures.base, issueComments: [fixtures.cleanComment] });
   assert.equal(clean.phase, "terminal");
   assert.equal(clean.signal, "clean-comment");
 
-  const cleanReaction = evaluate({ ...fixtures.base, reactions: [fixtures.cleanReaction] });
+  const cleanReaction = strictEvaluate({ ...fixtures.base, reactions: [fixtures.cleanReaction] });
   assert.equal(cleanReaction.phase, "terminal");
   assert.equal(cleanReaction.signal, "clean-reaction");
 
-  const requestCommentClean = evaluate({
+  const requestCommentClean = strictEvaluate({
     ...fixtures.base,
     issueComments: [fixtures.completedReviewRequestComment],
   });
   assert.equal(requestCommentClean.phase, "terminal");
   assert.equal(requestCommentClean.signal, "clean-reaction");
 
-  const mismatchedClean = evaluate({
+  const mismatchedClean = strictEvaluate({
     ...fixtures.base,
     issueComments: [fixtures.mismatchedCleanComment],
   });
@@ -117,64 +118,183 @@ test("strict mode requires a current-HEAD LGTM", () => {
 });
 
 test("strict mode lets follow-up review liveness supersede a completed review", () => {
-  const followUpEyes = evaluate({
-    ...fixtures.base,
-    reviews: [fixtures.terminalReview],
-    reactions: [fixtures.followUpEyes],
-  });
+  const followUpEyes = evaluate(
+    {
+      ...fixtures.base,
+      reviews: [fixtures.terminalReview],
+      reactions: [fixtures.followUpEyes],
+    },
+    true,
+  );
   assert.equal(followUpEyes.phase, "reviewing");
   assert.equal(followUpEyes.signal, "eyes");
 
-  const followUpProgress = evaluate({
-    ...fixtures.base,
-    reviews: [fixtures.terminalReview],
-    issueComments: [fixtures.followUpProgressComment],
-  });
+  const followUpProgress = evaluate(
+    {
+      ...fixtures.base,
+      reviews: [fixtures.terminalReview],
+      issueComments: [fixtures.followUpProgressComment],
+    },
+    true,
+  );
   assert.equal(followUpProgress.phase, "reviewing");
   assert.equal(followUpProgress.signal, "progress-comment");
 
-  const leftoverEyes = evaluate({
-    ...fixtures.base,
-    reviews: [fixtures.terminalReview],
-    reactions: [fixtures.eyes],
-  });
+  const leftoverEyes = evaluate(
+    {
+      ...fixtures.base,
+      reviews: [fixtures.terminalReview],
+      reactions: [fixtures.eyes],
+    },
+    true,
+  );
   assert.equal(leftoverEyes.phase, "awaiting-lgtm");
   assert.equal(leftoverEyes.signal, "review:commented");
 });
 
 test("lenient mode accepts stale terminal evidence of any supported kind", () => {
-  const staleReview = evaluate({ ...fixtures.base, reviews: [fixtures.oldReview] }, true);
+  const staleReview = evaluate({ ...fixtures.base, reviews: [fixtures.oldReview] });
   assert.equal(staleReview.phase, "terminal");
   assert.equal(staleReview.signal, "review:commented");
 
   const staleComment = evaluate(
     { ...fixtures.base, issueComments: [fixtures.mismatchedCleanComment] },
-    true,
   );
   assert.equal(staleComment.phase, "terminal");
   assert.equal(staleComment.signal, "clean-comment");
 
   const staleReaction = evaluate(
     { ...fixtures.base, reactions: [fixtures.staleCleanReaction] },
-    true,
   );
   assert.equal(staleReaction.phase, "terminal");
   assert.equal(staleReaction.signal, "clean-reaction");
 
-  const currentReview = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] }, true);
+  const currentReview = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
   assert.equal(currentReview.phase, "terminal");
   assert.equal(currentReview.signal, "review:commented");
 });
 
+test("lenient mode reports the freshest verdict across evidence kinds", () => {
+  const lgtmAfterReview = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.cleanReaction],
+  });
+  assert.equal(lgtmAfterReview.phase, "terminal");
+  assert.equal(lgtmAfterReview.signal, "clean-reaction");
+
+  const reviewAfterCleanComment = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.cleanComment],
+  });
+  assert.equal(reviewAfterCleanComment.phase, "terminal");
+  assert.equal(reviewAfterCleanComment.signal, "review:commented");
+});
+
+test("lenient mode waits when a review started after the latest verdict", () => {
+  const staleReviewPlusEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    reactions: [fixtures.eyes],
+  });
+  assert.equal(staleReviewPlusEyes.phase, "reviewing");
+  assert.equal(staleReviewPlusEyes.signal, "eyes");
+
+  const staleReviewPlusStaleEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    reactions: [fixtures.staleEyes],
+  });
+  assert.equal(staleReviewPlusStaleEyes.phase, "terminal");
+
+  const currentReviewPlusLeftoverEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.eyes],
+  });
+  assert.equal(currentReviewPlusLeftoverEyes.phase, "terminal");
+  assert.equal(currentReviewPlusLeftoverEyes.signal, "review:commented");
+
+  const currentReviewPlusNewEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.followUpEyes],
+  });
+  assert.equal(currentReviewPlusNewEyes.phase, "reviewing");
+  assert.equal(currentReviewPlusNewEyes.signal, "eyes");
+});
+
+test("the newest same-kind liveness artifact wins the timestamp comparison", () => {
+  const multiProgress = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.progressComment, fixtures.followUpProgressComment],
+  });
+  assert.equal(multiProgress.phase, "reviewing");
+  assert.equal(multiProgress.signal, "progress-comment");
+
+  const multiEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.eyes, fixtures.followUpEyes],
+  });
+  assert.equal(multiEyes.phase, "reviewing");
+  assert.equal(multiEyes.signal, "eyes");
+});
+
+test("terminal results expose the selected artifact timestamp", () => {
+  const reviewOnly = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
+  assert.equal(reviewOnly.terminalAt, Date.parse("2026-08-31T10:02:00Z"));
+
+  const lgtmLater = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.cleanReaction],
+  });
+  assert.equal(lgtmLater.terminalAt, Date.parse("2026-08-31T10:03:00Z"));
+
+  const notTerminal = evaluate(fixtures.base);
+  assert.equal(notTerminal.terminalAt, null);
+
+  const strictRetainedLgtm = evaluate(
+    {
+      ...fixtures.base,
+      reviews: [fixtures.terminalReview],
+      issueComments: [fixtures.cleanComment],
+    },
+    true,
+  );
+  assert.equal(strictRetainedLgtm.phase, "terminal");
+  assert.equal(strictRetainedLgtm.signal, "clean-comment");
+  assert.equal(strictRetainedLgtm.terminalAt, Date.parse("2026-08-31T10:02:00Z"));
+
+  const awaitingLgtm = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] }, true);
+  assert.equal(awaitingLgtm.phase, "awaiting-lgtm");
+  assert.equal(awaitingLgtm.terminalAt, Date.parse("2026-08-31T10:02:00Z"));
+});
+
+test("blocked results discount terminal evidence when a newer review is running", () => {
+  const blocked = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.followUpEyes],
+    threads: [fixtures.unresolvedThread],
+  });
+  assert.equal(blocked.phase, "blocked");
+  assert.equal(blocked.currentHeadTerminal, false);
+  assert.equal(blocked.currentHeadLiveness, true);
+});
+
 test("every unresolved Codex thread blocks, including outdated threads, in both modes", () => {
-  for (const passWithoutLgtm of [false, true]) {
+  for (const requireLgtm of [false, true]) {
     const blocked = evaluate(
       {
         ...fixtures.base,
         issueComments: [fixtures.cleanComment],
         threads: [fixtures.outdatedThread],
       },
-      passWithoutLgtm,
+      requireLgtm,
     );
     assert.equal(blocked.phase, "blocked");
     assert.equal(blocked.signal, "unresolved-threads");
@@ -185,26 +305,22 @@ test("every unresolved Codex thread blocks, including outdated threads, in both 
 test("blocked results expose the configured terminal pass-condition", () => {
   const strictReview = evaluate(
     { ...fixtures.base, reviews: [fixtures.terminalReview], threads: [fixtures.unresolvedThread] },
-    false,
+    true,
   );
   assert.equal(strictReview.currentHeadTerminal, false);
 
   const strictLgtm = evaluate(
     { ...fixtures.base, issueComments: [fixtures.cleanComment], threads: [fixtures.unresolvedThread] },
-    false,
+    true,
   );
   assert.equal(strictLgtm.currentHeadTerminal, true);
 
   const lenientStaleReview = evaluate(
     { ...fixtures.base, reviews: [fixtures.oldReview], threads: [fixtures.unresolvedThread] },
-    true,
   );
   assert.equal(lenientStaleReview.currentHeadTerminal, true);
 
-  const lenientNoEvidence = evaluate(
-    { ...fixtures.base, threads: [fixtures.unresolvedThread] },
-    true,
-  );
+  const lenientNoEvidence = evaluate({ ...fixtures.base, threads: [fixtures.unresolvedThread] });
   assert.equal(lenientNoEvidence.currentHeadTerminal, false);
 });
 

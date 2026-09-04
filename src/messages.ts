@@ -69,7 +69,7 @@ export function failureOutput(
   evaluation: ReviewEvaluation,
   runId: string | undefined,
   reviewHint: ReviewHintPolicy,
-  passWithoutLgtm = false,
+  requireLgtm = false,
 ): FailureOutput {
   const rerun = rerunCommand(runId);
   if (reason === "unresolved-threads") {
@@ -136,14 +136,14 @@ export function failureOutput(
         logLines: [message],
         annotation:
           `${message} Request a fresh review after handling its threads: ${reviewRequestCommand(snapshot.pullRequest)} — ` +
-          `then re-run: ${rerun}. Or set pass-without-lgtm: true to accept a completed review without an LGTM.`,
+          `then re-run: ${rerun}. Or drop require-lgtm to accept a completed review without an LGTM.`,
       };
     }
     return {
       logLines: [message],
       annotation:
         `${message} Verify the connector triggered a fresh review after handling its threads, then re-run: ${rerun}. ` +
-        "Or set pass-without-lgtm: true to accept a completed review without an LGTM.",
+        "Or drop require-lgtm to accept a completed review without an LGTM.",
     };
   }
   return {
@@ -162,7 +162,7 @@ export function summaryMarkdown(
   reason: string,
   runId: string | undefined,
   reviewHint: ReviewHintPolicy,
-  passWithoutLgtm = false,
+  requireLgtm = false,
 ): string {
   const rerun = rerunCommand(runId);
   const lines = [
@@ -288,7 +288,7 @@ export function summaryMarkdown(
         "```",
       );
     }
-    lines.push("", "Or set `pass-without-lgtm: true` to accept a completed review without an LGTM.");
+    lines.push("", "Or drop `require-lgtm` to accept a completed review without an LGTM.");
   } else if (reason === "review-timeout") {
     lines.push(
       "## Review still in progress",
@@ -301,9 +301,13 @@ export function summaryMarkdown(
     );
   } else {
     lines.push("## Ready", "");
-    if (passWithoutLgtm) {
+    if (!requireLgtm) {
+      const lgtmObserved =
+        evaluation.signal === "clean-comment" || evaluation.signal === "clean-reaction";
       lines.push(
-        "Codex completed a review and it was accepted without an LGTM under `pass-without-lgtm`. No unresolved Codex review thread blocks.",
+        lgtmObserved
+          ? "Codex left an LGTM and no unresolved Codex review thread blocks. Lenient mode did not require the LGTM to attest the current HEAD."
+          : "Codex completed a review and it was accepted under the default lenient mode without an LGTM. No unresolved Codex review thread blocks.",
       );
     } else {
       lines.push(
