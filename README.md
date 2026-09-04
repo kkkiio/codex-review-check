@@ -32,29 +32,20 @@ $ gh run view --log-failed
 
 The job summary mirrors the same guidance in the web UI for human debugging.
 
-The check follows this state model:
+The check follows this state model — each evaluation walks the chain and stops at the first match:
 
-```mermaid
-flowchart LR
-    A([Run / rerun]) --> B[1 · Handle known findings]
-
-    B -- unresolved --> C[Fail · resolve conversations]
-    C --> A
-
-    B -- clear --> D[2 · Check current HEAD review]
-
-    D -- "terminal review / 👍 / clean comment" --> E([Pass])
-    D -- "review findings" --> I[Resolve each finding]
-    I --> J[Re-run the check]
-    J --> A
-
-    D -- "👀 / progress" --> F[Pending · wait]
-    F --> D
-
-    D -- "no current-HEAD signal" --> G[Fail · show @codex review hint]
-    G --> H[Request review, then rerun]
-    H --> A
+```text
+1 · Unresolved Codex threads → fail: fix each finding — or reply with reasoning — then resolve
+2 · A review started after the latest verdict is running (👀 / progress) → keep waiting
+3 · Completed review evidence → pass
+      lenient (default):    the latest completed verdict on any HEAD
+      require-lgtm: true:   an LGTM (👍 / "Didn't find any major issues") on the current HEAD
+4 · Strict only — a completed current-HEAD review without an LGTM → fail with a re-review hint
+5 · No signal after grace-seconds → fail with the @codex review hint
+6 · A review that never finishes → fail at review-timeout-seconds
 ```
+
+Failures print the concrete next command in the job log; re-running the job re-evaluates live pull request state.
 
 ## Configuration
 
