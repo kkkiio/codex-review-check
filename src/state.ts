@@ -55,7 +55,7 @@ export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommen
 export function evaluateReviewState(
   snapshot: ReviewSnapshot,
   botLogins: ReadonlySet<string>,
-  passWithoutLgtm: boolean,
+  requireLgtm: boolean,
 ): ReviewEvaluation {
   const normalizedBots = new Set(
     [...botLogins].map((login) => login.trim().toLowerCase().replace(/\[bot\]$/u, "")),
@@ -90,9 +90,9 @@ export function evaluateReviewState(
     botTerminalReviews.filter((review) => review.commitId.toLowerCase() === currentHead),
     (review) => review.submittedAt,
   );
-  const terminalReview = passWithoutLgtm
-    ? latestByDate(botTerminalReviews, (review) => review.submittedAt)
-    : headTerminalReview;
+  const terminalReview = requireLgtm
+    ? headTerminalReview
+    : latestByDate(botTerminalReviews, (review) => review.submittedAt);
 
   const botCleanSignals = snapshot.issueComments
     .filter((comment) => isBot(comment.author))
@@ -109,9 +109,9 @@ export function evaluateReviewState(
     ),
     ({ comment }) => comment.createdAt,
   );
-  const cleanSignal = passWithoutLgtm
-    ? latestByDate(botCleanSignals, ({ comment }) => comment.createdAt)
-    : headCleanSignal;
+  const cleanSignal = requireLgtm
+    ? headCleanSignal
+    : latestByDate(botCleanSignals, ({ comment }) => comment.createdAt);
 
   const botCleanReactions = observedReactions.filter(
     (reaction) =>
@@ -120,13 +120,13 @@ export function evaluateReviewState(
   const isFresh = (record: { createdAt: string | null }) =>
     (record.createdAt ? Date.parse(record.createdAt) : Number.NEGATIVE_INFINITY) >= headCommittedAt;
   const headCleanReaction = latestByDate(botCleanReactions.filter(isFresh), (reaction) => reaction.createdAt);
-  const cleanReaction = passWithoutLgtm
-    ? latestByDate(botCleanReactions, (reaction) => reaction.createdAt)
-    : headCleanReaction;
+  const cleanReaction = requireLgtm
+    ? headCleanReaction
+    : latestByDate(botCleanReactions, (reaction) => reaction.createdAt);
 
-  const currentHeadTerminal = passWithoutLgtm
-    ? Boolean(terminalReview ?? cleanSignal ?? cleanReaction)
-    : Boolean(headCleanSignal ?? headCleanReaction);
+  const currentHeadTerminal = requireLgtm
+    ? Boolean(headCleanSignal ?? headCleanReaction)
+    : Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
 
   const progressComment = snapshot.issueComments.find((comment) => {
     if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
@@ -158,21 +158,21 @@ export function evaluateReviewState(
   if (currentHeadTerminal) {
     return {
       phase: "terminal",
-      signal: passWithoutLgtm
-        ? terminalReview
+      signal: requireLgtm
+        ? headCleanSignal
+          ? "clean-comment"
+          : "clean-reaction"
+        : terminalReview
           ? `review:${terminalReview.state.toLowerCase()}`
           : cleanSignal
             ? "clean-comment"
-            : "clean-reaction"
-        : headCleanSignal
-          ? "clean-comment"
-          : "clean-reaction",
+            : "clean-reaction",
       unresolvedThreads,
       currentHeadTerminal: true,
       currentHeadLiveness,
     };
   }
-  if (!passWithoutLgtm && headTerminalReview) {
+  if (requireLgtm && headTerminalReview) {
     const reviewedAt = Date.parse(headTerminalReview.submittedAt ?? "");
     const followUpLiveness = [progressComment, eyesReaction].some((record) => {
       const createdAt = record?.createdAt;
