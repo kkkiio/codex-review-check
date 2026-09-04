@@ -156,6 +156,36 @@ export function evaluateReviewState(
       currentHeadLiveness,
     };
   }
+  // Lenient mode: report the freshest verdict across evidence kinds — a 👍
+  // landing after a findings review means the latest word is an LGTM, not the
+  // review. Ties prefer the later candidate, so clean evidence beats a review.
+  const lenientSignal = (): string => {
+    const candidates: { name: string; time: number }[] = [];
+    if (terminalReview) {
+      candidates.push({
+        name: `review:${terminalReview.state.toLowerCase()}`,
+        time: terminalReview.submittedAt ? Date.parse(terminalReview.submittedAt) : 0,
+      });
+    }
+    if (cleanSignal) {
+      candidates.push({
+        name: "clean-comment",
+        time: cleanSignal.comment.createdAt ? Date.parse(cleanSignal.comment.createdAt) : 0,
+      });
+    }
+    if (cleanReaction) {
+      candidates.push({
+        name: "clean-reaction",
+        time: cleanReaction.createdAt ? Date.parse(cleanReaction.createdAt) : 0,
+      });
+    }
+    let best = candidates[0];
+    for (const candidate of candidates) {
+      if (best === undefined || candidate.time >= best.time) best = candidate;
+    }
+    return best?.name ?? "none";
+  };
+
   // Lenient mode accepts stale terminal evidence, but a fresh current-HEAD
   // liveness signal supersedes it: passing on an older verdict while Codex is
   // actively reviewing the current HEAD would let new findings land after the
@@ -167,11 +197,7 @@ export function evaluateReviewState(
         ? headCleanSignal
           ? "clean-comment"
           : "clean-reaction"
-        : terminalReview
-          ? `review:${terminalReview.state.toLowerCase()}`
-          : cleanSignal
-            ? "clean-comment"
-            : "clean-reaction",
+        : lenientSignal(),
       unresolvedThreads,
       currentHeadTerminal: true,
       currentHeadLiveness,

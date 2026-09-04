@@ -174,6 +174,24 @@ test("lenient mode accepts stale terminal evidence of any supported kind", () =>
   assert.equal(currentReview.signal, "review:commented");
 });
 
+test("lenient mode reports the freshest verdict across evidence kinds", () => {
+  const lgtmAfterReview = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.cleanReaction],
+  });
+  assert.equal(lgtmAfterReview.phase, "terminal");
+  assert.equal(lgtmAfterReview.signal, "clean-reaction");
+
+  const reviewAfterCleanComment = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.cleanComment],
+  });
+  assert.equal(reviewAfterCleanComment.phase, "terminal");
+  assert.equal(reviewAfterCleanComment.signal, "review:commented");
+});
+
 test("lenient mode lets fresh current-HEAD liveness supersede stale terminal evidence", () => {
   const staleReviewPlusEyes = evaluate({
     ...fixtures.base,
