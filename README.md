@@ -49,9 +49,9 @@ flowchart TB
     D -- none --> F{3 · verdict}
     F -- none --> G[Fail · @codex review hint]
     G --> A
-    F -- "lenient · latest verdict, any HEAD" --> H([Pass])
-    F -- "require-lgtm · LGTM on current HEAD" --> H
-    F -- "require-lgtm · findings-only review" --> I[Fail · re-review hint]
+    F -- "lenient · any HEAD" --> H([Pass])
+    F -- "strict · LGTM" --> H
+    F -- "strict · findings only" --> I[Fail · re-review hint]
     I --> A
     classDef pass fill:#dafbe1,stroke:#1a7f37
     classDef fail fill:#ffebe9,stroke:#cf222e
