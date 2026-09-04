@@ -44,7 +44,7 @@ Keep `cancel-in-progress: true` for the pull-request concurrency group so a new 
 
 The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
 
-- Liveness artifacts (👀 or a progress comment) never pass the check; they keep the job waiting.
+- Liveness artifacts (👀 or a progress comment) keep the job waiting. Fresh current-HEAD liveness supersedes stale terminal evidence, so lenient mode cannot pass on an older verdict while Codex is actively reviewing the current HEAD; terminal evidence that already attests the current HEAD is not superseded.
 - In the default lenient mode, the most recent completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, once no unresolved Codex review thread remains.
 - With `require-lgtm: true`, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
 - A terminal review with `COMMENTED`, `CHANGES_REQUESTED`, or `APPROVED` state is not an LGTM, even when it has no findings.

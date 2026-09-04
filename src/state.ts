@@ -127,6 +127,7 @@ export function evaluateReviewState(
   const currentHeadTerminal = requireLgtm
     ? Boolean(headCleanSignal ?? headCleanReaction)
     : Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
+  const currentHeadAttested = Boolean(headTerminalReview ?? headCleanSignal ?? headCleanReaction);
 
   const progressComment = snapshot.issueComments.find((comment) => {
     if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
@@ -155,7 +156,11 @@ export function evaluateReviewState(
       currentHeadLiveness,
     };
   }
-  if (currentHeadTerminal) {
+  // Lenient mode accepts stale terminal evidence, but a fresh current-HEAD
+  // liveness signal supersedes it: passing on an older verdict while Codex is
+  // actively reviewing the current HEAD would let new findings land after the
+  // gate opens. Current-HEAD evidence is not superseded — it is not stale.
+  if (currentHeadTerminal && (requireLgtm || currentHeadAttested || !currentHeadLiveness)) {
     return {
       phase: "terminal",
       signal: requireLgtm

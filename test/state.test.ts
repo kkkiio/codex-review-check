@@ -174,6 +174,31 @@ test("lenient mode accepts stale terminal evidence of any supported kind", () =>
   assert.equal(currentReview.signal, "review:commented");
 });
 
+test("lenient mode lets fresh current-HEAD liveness supersede stale terminal evidence", () => {
+  const staleReviewPlusEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    reactions: [fixtures.eyes],
+  });
+  assert.equal(staleReviewPlusEyes.phase, "reviewing");
+  assert.equal(staleReviewPlusEyes.signal, "eyes");
+
+  const staleReviewPlusStaleEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    reactions: [fixtures.staleEyes],
+  });
+  assert.equal(staleReviewPlusStaleEyes.phase, "terminal");
+
+  const currentReviewPlusEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.eyes],
+  });
+  assert.equal(currentReviewPlusEyes.phase, "terminal");
+  assert.equal(currentReviewPlusEyes.signal, "review:commented");
+});
+
 test("every unresolved Codex thread blocks, including outdated threads, in both modes", () => {
   for (const requireLgtm of [false, true]) {
     const blocked = evaluate(
