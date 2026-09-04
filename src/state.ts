@@ -127,7 +127,6 @@ export function evaluateReviewState(
   const currentHeadTerminal = requireLgtm
     ? Boolean(headCleanSignal ?? headCleanReaction)
     : Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
-  const currentHeadAttested = Boolean(headTerminalReview ?? headCleanSignal ?? headCleanReaction);
 
   const progressComment = snapshot.issueComments.find((comment) => {
     if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
@@ -156,6 +155,40 @@ export function evaluateReviewState(
       currentHeadLiveness,
     };
   }
+  // A review that started after the latest completed verdict keeps the job
+  // waiting: it was paid for (auto-review on push, or an explicit @codex
+  // review request), so its result must land before the gate opens. Liveness
+  // predating the latest verdict is a leftover of that completed review.
+  const latestTerminalAt = Math.max(
+    Number.NEGATIVE_INFINITY,
+    ...botTerminalReviews.map((review) =>
+      review.submittedAt ? Date.parse(review.submittedAt) : Number.NEGATIVE_INFINITY,
+    ),
+    ...botCleanSignals.map(({ comment }) =>
+      comment.createdAt ? Date.parse(comment.createdAt) : Number.NEGATIVE_INFINITY,
+    ),
+    ...botCleanReactions.map((reaction) =>
+      reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY,
+    ),
+  );
+  const newReviewStarted = [progressComment, eyesReaction].some((record) => {
+    const createdAt = record?.createdAt;
+    return createdAt != null && Date.parse(createdAt) > latestTerminalAt;
+  });
+  if (newReviewStarted) {
+    const latestLiveness = latestByDate(
+      [progressComment, eyesReaction].filter((record) => record != null),
+      (record) => record.createdAt,
+    );
+    return {
+      phase: "reviewing",
+      signal: latestLiveness === progressComment ? "progress-comment" : "eyes",
+      unresolvedThreads,
+      currentHeadTerminal: false,
+      currentHeadLiveness: true,
+    };
+  }
+
   // Lenient mode: report the freshest verdict across evidence kinds — a 👍
   // landing after a findings review means the latest word is an LGTM, not the
   // review. Ties prefer the later candidate, so clean evidence beats a review.
@@ -186,11 +219,7 @@ export function evaluateReviewState(
     return best?.name ?? "none";
   };
 
-  // Lenient mode accepts stale terminal evidence, but a fresh current-HEAD
-  // liveness signal supersedes it: passing on an older verdict while Codex is
-  // actively reviewing the current HEAD would let new findings land after the
-  // gate opens. Current-HEAD evidence is not superseded — it is not stale.
-  if (currentHeadTerminal && (requireLgtm || currentHeadAttested || !currentHeadLiveness)) {
+  if (currentHeadTerminal) {
     return {
       phase: "terminal",
       signal: requireLgtm
@@ -204,29 +233,12 @@ export function evaluateReviewState(
     };
   }
   if (requireLgtm && headTerminalReview) {
-    const reviewedAt = Date.parse(headTerminalReview.submittedAt ?? "");
-    const followUpLiveness = [progressComment, eyesReaction].some((record) => {
-      const createdAt = record?.createdAt;
-      return createdAt != null && Date.parse(createdAt) > reviewedAt;
-    });
-    if (!followUpLiveness) {
-      return {
-        phase: "awaiting-lgtm",
-        signal: `review:${headTerminalReview.state.toLowerCase()}`,
-        unresolvedThreads,
-        currentHeadTerminal: false,
-        currentHeadLiveness,
-      };
-    }
-  }
-
-  if (progressComment || eyesReaction) {
     return {
-      phase: "reviewing",
-      signal: progressComment ? "progress-comment" : "eyes",
+      phase: "awaiting-lgtm",
+      signal: `review:${headTerminalReview.state.toLowerCase()}`,
       unresolvedThreads,
       currentHeadTerminal: false,
-      currentHeadLiveness: true,
+      currentHeadLiveness,
     };
   }
 

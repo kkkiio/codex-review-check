@@ -192,7 +192,7 @@ test("lenient mode reports the freshest verdict across evidence kinds", () => {
   assert.equal(reviewAfterCleanComment.signal, "review:commented");
 });
 
-test("lenient mode lets fresh current-HEAD liveness supersede stale terminal evidence", () => {
+test("lenient mode waits when a review started after the latest verdict", () => {
   const staleReviewPlusEyes = evaluate({
     ...fixtures.base,
     reviews: [fixtures.oldReview],
@@ -208,13 +208,21 @@ test("lenient mode lets fresh current-HEAD liveness supersede stale terminal evi
   });
   assert.equal(staleReviewPlusStaleEyes.phase, "terminal");
 
-  const currentReviewPlusEyes = evaluate({
+  const currentReviewPlusLeftoverEyes = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
     reactions: [fixtures.eyes],
   });
-  assert.equal(currentReviewPlusEyes.phase, "terminal");
-  assert.equal(currentReviewPlusEyes.signal, "review:commented");
+  assert.equal(currentReviewPlusLeftoverEyes.phase, "terminal");
+  assert.equal(currentReviewPlusLeftoverEyes.signal, "review:commented");
+
+  const currentReviewPlusNewEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.followUpEyes],
+  });
+  assert.equal(currentReviewPlusNewEyes.phase, "reviewing");
+  assert.equal(currentReviewPlusNewEyes.signal, "eyes");
 });
 
 test("every unresolved Codex thread blocks, including outdated threads, in both modes", () => {
