@@ -231,21 +231,17 @@ export function evaluateReviewState(
   };
 
   if (currentHeadTerminal) {
-    const verdict = requireLgtm
-      ? headCleanSignal
-        ? {
-            name: "clean-comment",
-            time: headCleanSignal.comment.createdAt ? Date.parse(headCleanSignal.comment.createdAt) : 0,
-          }
-        : {
-            name: "clean-reaction",
-            time: headCleanReaction?.createdAt ? Date.parse(headCleanReaction.createdAt) : 0,
-          }
-      : lenientVerdict();
     return {
       phase: "terminal",
-      signal: verdict?.name ?? "none",
-      terminalAt: verdict?.time ?? null,
+      signal: requireLgtm
+        ? headCleanSignal
+          ? "clean-comment"
+          : "clean-reaction"
+        : (lenientVerdict()?.name ?? "none"),
+      // Track the newest completed artifact, not the pass evidence: in strict
+      // mode a same-HEAD re-review can complete after the retained LGTM, and
+      // its threads still need their own settle window.
+      terminalAt: latestTerminalAt,
       unresolvedThreads,
       currentHeadTerminal: true,
       currentHeadLiveness,

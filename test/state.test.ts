@@ -256,6 +256,18 @@ test("terminal results expose the selected artifact timestamp", () => {
 
   const notTerminal = evaluate(fixtures.base);
   assert.equal(notTerminal.terminalAt, null);
+
+  const strictRetainedLgtm = evaluate(
+    {
+      ...fixtures.base,
+      reviews: [fixtures.terminalReview],
+      issueComments: [fixtures.cleanComment],
+    },
+    true,
+  );
+  assert.equal(strictRetainedLgtm.phase, "terminal");
+  assert.equal(strictRetainedLgtm.signal, "clean-comment");
+  assert.equal(strictRetainedLgtm.terminalAt, Date.parse("2026-08-31T10:02:00Z"));
 });
 
 test("blocked results discount terminal evidence when a newer review is running", () => {
