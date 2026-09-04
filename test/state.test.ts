@@ -243,6 +243,21 @@ test("the newest same-kind liveness artifact wins the timestamp comparison", () 
   assert.equal(multiEyes.signal, "eyes");
 });
 
+test("terminal results expose the selected artifact timestamp", () => {
+  const reviewOnly = evaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
+  assert.equal(reviewOnly.terminalAt, Date.parse("2026-08-31T10:02:00Z"));
+
+  const lgtmLater = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.cleanReaction],
+  });
+  assert.equal(lgtmLater.terminalAt, Date.parse("2026-08-31T10:03:00Z"));
+
+  const notTerminal = evaluate(fixtures.base);
+  assert.equal(notTerminal.terminalAt, null);
+});
+
 test("blocked results discount terminal evidence when a newer review is running", () => {
   const blocked = evaluate({
     ...fixtures.base,

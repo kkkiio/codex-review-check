@@ -182,6 +182,7 @@ export function evaluateReviewState(
       // known to be sufficient yet.
       currentHeadTerminal: currentHeadTerminal && !newReviewStarted,
       currentHeadLiveness,
+      terminalAt: null,
     };
   }
   if (newReviewStarted) {
@@ -195,13 +196,14 @@ export function evaluateReviewState(
       unresolvedThreads,
       currentHeadTerminal: false,
       currentHeadLiveness: true,
+      terminalAt: null,
     };
   }
 
   // Lenient mode: report the freshest verdict across evidence kinds — a 👍
   // landing after a findings review means the latest word is an LGTM, not the
   // review. Ties prefer the later candidate, so clean evidence beats a review.
-  const lenientSignal = (): string => {
+  const lenientVerdict = (): { name: string; time: number } | undefined => {
     const candidates: { name: string; time: number }[] = [];
     if (terminalReview) {
       candidates.push({
@@ -225,17 +227,25 @@ export function evaluateReviewState(
     for (const candidate of candidates) {
       if (best === undefined || candidate.time >= best.time) best = candidate;
     }
-    return best?.name ?? "none";
+    return best;
   };
 
   if (currentHeadTerminal) {
+    const verdict = requireLgtm
+      ? headCleanSignal
+        ? {
+            name: "clean-comment",
+            time: headCleanSignal.comment.createdAt ? Date.parse(headCleanSignal.comment.createdAt) : 0,
+          }
+        : {
+            name: "clean-reaction",
+            time: headCleanReaction?.createdAt ? Date.parse(headCleanReaction.createdAt) : 0,
+          }
+      : lenientVerdict();
     return {
       phase: "terminal",
-      signal: requireLgtm
-        ? headCleanSignal
-          ? "clean-comment"
-          : "clean-reaction"
-        : lenientSignal(),
+      signal: verdict?.name ?? "none",
+      terminalAt: verdict?.time ?? null,
       unresolvedThreads,
       currentHeadTerminal: true,
       currentHeadLiveness,
@@ -248,6 +258,7 @@ export function evaluateReviewState(
       unresolvedThreads,
       currentHeadTerminal: false,
       currentHeadLiveness,
+      terminalAt: null,
     };
   }
 
@@ -257,5 +268,6 @@ export function evaluateReviewState(
     unresolvedThreads,
     currentHeadTerminal: false,
     currentHeadLiveness: false,
+    terminalAt: null,
   };
 }

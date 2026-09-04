@@ -117,6 +117,7 @@ async function run(): Promise<void> {
   let observedHeadSha = "";
   let livenessSeen = false;
   let terminalSeenAt: number | null = null;
+  let terminalEvidenceAt: number | null = null;
   let lastPhase = "";
   while (true) {
     const snapshot = await loadReviewSnapshot(config.token, config.repository, config.pullRequest);
@@ -125,6 +126,7 @@ async function run(): Promise<void> {
       headStartedAt = Date.now();
       livenessSeen = false;
       terminalSeenAt = null;
+      terminalEvidenceAt = null;
       lastPhase = "";
       core.info(`Evaluating live pull request HEAD ${observedHeadSha}.`);
     }
@@ -161,6 +163,13 @@ async function run(): Promise<void> {
       core.setFailed(output.annotation);
       return;
     } else if (evaluation.phase === "terminal") {
+      // A newer verdict needs its own settle window: its review threads may
+      // still be propagating even though the phase stayed terminal.
+      if (evaluation.terminalAt !== terminalEvidenceAt) {
+        terminalEvidenceAt = evaluation.terminalAt;
+        terminalSeenAt = Date.now();
+        core.info("Accepted terminal verdict changed; restarting the settle window.");
+      }
       terminalSeenAt ??= Date.now();
       const settledSeconds = Math.floor((Date.now() - terminalSeenAt) / 1000);
       if (settledSeconds < config.terminalSettleSeconds) {
@@ -182,6 +191,7 @@ async function run(): Promise<void> {
       terminalSeenAt ??= Date.now();
     } else {
       terminalSeenAt = null;
+      terminalEvidenceAt = null;
     }
 
     if (evaluation.phase === "awaiting-lgtm" && elapsedSeconds >= config.graceSeconds) {

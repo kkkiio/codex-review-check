@@ -113,6 +113,7 @@ function evaluation(overrides: Partial<ReviewEvaluation>): ReviewEvaluation {
     unresolvedThreads: [],
     currentHeadTerminal: false,
     currentHeadLiveness: false,
+    terminalAt: null,
     ...overrides,
   };
 }
