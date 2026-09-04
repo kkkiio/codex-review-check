@@ -148,19 +148,6 @@ export function evaluateReviewState(
   );
   const currentHeadLiveness = Boolean(progressComment ?? eyesReaction);
 
-  const unresolvedThreads = snapshot.threads.filter(
-    (thread) =>
-      !thread.isResolved && thread.comments.some((comment) => isBot(comment.author)),
-  );
-  if (unresolvedThreads.length > 0) {
-    return {
-      phase: "blocked",
-      signal: "unresolved-threads",
-      unresolvedThreads,
-      currentHeadTerminal,
-      currentHeadLiveness,
-    };
-  }
   // A review that started after the latest completed verdict keeps the job
   // waiting: it was paid for (auto-review on push, or an explicit @codex
   // review request), so its result must land before the gate opens. Liveness
@@ -181,6 +168,22 @@ export function evaluateReviewState(
     const createdAt = record?.createdAt;
     return createdAt != null && Date.parse(createdAt) > latestTerminalAt;
   });
+
+  const unresolvedThreads = snapshot.threads.filter(
+    (thread) =>
+      !thread.isResolved && thread.comments.some((comment) => isBot(comment.author)),
+  );
+  if (unresolvedThreads.length > 0) {
+    return {
+      phase: "blocked",
+      signal: "unresolved-threads",
+      unresolvedThreads,
+      // A newer in-flight review may add findings, so resolving alone is not
+      // known to be sufficient yet.
+      currentHeadTerminal: currentHeadTerminal && !newReviewStarted,
+      currentHeadLiveness,
+    };
+  }
   if (newReviewStarted) {
     const latestLiveness = latestByDate(
       [progressComment, eyesReaction].filter((record) => record != null),

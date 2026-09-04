@@ -243,6 +243,18 @@ test("the newest same-kind liveness artifact wins the timestamp comparison", () 
   assert.equal(multiEyes.signal, "eyes");
 });
 
+test("blocked results discount terminal evidence when a newer review is running", () => {
+  const blocked = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.followUpEyes],
+    threads: [fixtures.unresolvedThread],
+  });
+  assert.equal(blocked.phase, "blocked");
+  assert.equal(blocked.currentHeadTerminal, false);
+  assert.equal(blocked.currentHeadLiveness, true);
+});
+
 test("every unresolved Codex thread blocks, including outdated threads, in both modes", () => {
   for (const requireLgtm of [false, true]) {
     const blocked = evaluate(
