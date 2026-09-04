@@ -10,7 +10,6 @@ Codex Review Check is a read-only, credit-aware GitHub Action that guides agents
 
 1. Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
 2. Enable Codex code review for the repository with the **On pull request** trigger, so each pull request receives an initial review.
-3. After its first pull request run, add the `Codex Review` job as a required check in the repository ruleset.
 
 ## Usage
 
@@ -41,14 +40,14 @@ config:
   theme: redux
 ---
 flowchart TB
-    A([Run / rerun]) --> B{1 · unresolved Codex threads?}
-    B -- yes --> C[Fail · fix, or reply with reasoning and resolve]
+    A([Run / rerun]) --> B{1 · threads}
+    B -- unresolved --> C[Fail · fix, or reply with reasoning and resolve]
     C --> A
-    B -- no --> D{2 · newer review running?}
+    B -- clear --> D{2 · liveness}
     D -- "👀 / progress" --> E[Wait · verdict or review-timeout]
     E --> A
-    D -- no --> F{3 · completed verdict?}
-    F -- no --> G[Fail · @codex review hint]
+    D -- none --> F{3 · verdict}
+    F -- none --> G[Fail · @codex review hint]
     G --> A
     F -- "lenient · latest verdict, any HEAD" --> H([Pass])
     F -- "require-lgtm · LGTM on current HEAD" --> H
