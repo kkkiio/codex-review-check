@@ -8,11 +8,8 @@ Codex Review Check is a read-only, credit-aware GitHub Action that guides agents
 
 ## Installation
 
-Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
-
-Enable Codex code review for the repository with the **On pull request** trigger so each pull request receives an initial review. The Action provides an explicit command when a later HEAD needs another review. By default, a completed review may pass without a current-HEAD LGTM; set `require-lgtm: true` for the strict gate.
-
-After its first pull request run, add the `Codex Review` job as a required check in the repository ruleset.
+1. Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
+2. Enable Codex code review for the repository with the **On pull request** trigger, so each pull request receives an initial review.
 
 ## Usage
 
@@ -32,28 +29,48 @@ $ gh run view --log-failed
 
 The job summary mirrors the same guidance in the web UI for human debugging.
 
-The check follows this state model:
+The initial review only covers the first HEAD. When a later push needs another review, the failure prints the explicit request command — `gh pr comment <PR> --body '@codex review'` — for the agent to run; the Action never spends Codex credits itself. By default a completed review passes once its threads are resolved; set `require-lgtm: true` to require a current-HEAD LGTM.
+
+The check follows this state model — the loop over time:
 
 ```mermaid
-flowchart LR
-    A([Run / rerun]) --> B[1 · Handle known findings]
-
-    B -- unresolved --> C[Fail · resolve conversations]
+---
+config:
+  look: neo
+  theme: redux
+---
+flowchart TB
+    A([Run / rerun]) --> B{1 · threads}
+    B -- unresolved --> C[Fail · fix, or reply with reasoning and resolve]
     C --> A
-
-    B -- clear --> D[2 · Check current HEAD review]
-
-    D -- "terminal review / 👍 / clean comment" --> E([Pass])
-    D -- "review findings" --> I[Resolve each finding]
-    I --> J[Re-run the check]
+    B -- clear --> D{2 · new liveness}
+    D -- "👀 / progress" --> E[Wait for the verdict]
+    E --> A
+    E -- "5 · review-timeout" --> J[Fail · review never finished]
     J --> A
+    D -- none --> F{3 · verdict}
+    F -- "4 · none past grace" --> G[Fail · @codex review hint]
+    G --> A
+    F -- "lenient · any HEAD" --> H([Pass])
+    F -- "strict · LGTM" --> H
+    F -- "strict · no LGTM" --> I[Fail · re-review hint · after grace + settle]
+    I --> A
+    classDef pass fill:#dafbe1,stroke:#1a7f37
+    classDef fail fill:#ffebe9,stroke:#cf222e
+    class H pass
+    class C,G,I,J fail
+```
 
-    D -- "👀 / progress" --> F[Pending · wait]
-    F --> D
+And its evaluation order — each evaluation stops at the first match:
 
-    D -- "no current-HEAD signal" --> G[Fail · show @codex review hint]
-    G --> H[Request review, then rerun]
-    H --> A
+```text
+1 · unresolved Codex threads    → fail · fix, or reply with reasoning and resolve
+2 · a newer review is running   → wait (👀 / progress comment)
+3 · completed verdict           → pass
+      lenient (default):  latest verdict, any HEAD
+      require-lgtm:       LGTM on the current HEAD — a verdict without an LGTM fails with a re-review hint after grace + settle
+4 · nothing after grace-seconds → fail · @codex review hint
+5 · review never finishes       → fail at review-timeout-seconds
 ```
 
 ## Configuration

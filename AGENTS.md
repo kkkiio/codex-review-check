@@ -58,7 +58,7 @@ Keep GitHub transport and pagination in `src/github.ts`, provider interpretation
 
 - When changing inputs or outputs, update `action.yml` and `docs/CONFIGURATION.md` together.
 - When Codex connector behavior is newly observed or changes, record it in `docs/CODEX_GITHUB_SIGNALS.md` and add or revise a fixture in `test/fixtures/`; keep acceptance policy in `docs/CONFIGURATION.md` and out of the behavior record.
-- When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links.
+- When changing product intent or state priority, record the rationale in `docs/adr/`; keep `README.md` limited to observable behavior and first use, without implementation rationale or ADR links. The README state-model diagram and ordered decision chain describe the same evaluation: node numbers match chain entries, so change both together.
 - Agent-facing wording in `src/messages.ts` is pinned by plain-text fixtures in `test/fixtures/messages/`; regenerate with `npm run fixtures:update` and review the wording diff.
 
 ### Runtime and release
