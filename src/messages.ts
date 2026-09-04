@@ -302,8 +302,12 @@ export function summaryMarkdown(
   } else {
     lines.push("## Ready", "");
     if (!requireLgtm) {
+      const lgtmObserved =
+        evaluation.signal === "clean-comment" || evaluation.signal === "clean-reaction";
       lines.push(
-        "Codex completed a review and it was accepted under the default lenient mode without an LGTM. No unresolved Codex review thread blocks.",
+        lgtmObserved
+          ? "Codex left an LGTM and no unresolved Codex review thread blocks. Lenient mode did not require the LGTM to attest the current HEAD."
+          : "Codex completed a review and it was accepted under the default lenient mode without an LGTM. No unresolved Codex review thread blocks.",
       );
     } else {
       lines.push(

@@ -1,0 +1,9 @@
+# Codex Review
+
+| Pull request | HEAD | State | Signal |
+| --- | --- | --- | --- |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | success | clean-reaction |
+
+## Ready
+
+Codex left an LGTM and no unresolved Codex review thread blocks. Lenient mode did not require the LGTM to attest the current HEAD.

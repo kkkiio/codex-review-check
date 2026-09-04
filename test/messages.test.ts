@@ -232,6 +232,20 @@ test("ready lenient success summary is the default", () => {
   expectFixture("ready", ready);
 });
 
+test("ready lenient success summary reports an observed LGTM", () => {
+  expectFixture(
+    "ready-lenient-lgtm",
+    summaryMarkdown(
+      snapshot,
+      evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
+      "success",
+      "ready",
+      RUN_ID,
+      "suggest",
+    ),
+  );
+});
+
 test("ready strict success summary", () => {
   expectFixture(
     "ready-require-lgtm",
