@@ -128,18 +128,24 @@ export function evaluateReviewState(
     ? Boolean(headCleanSignal ?? headCleanReaction)
     : Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
 
-  const progressComment = snapshot.issueComments.find((comment) => {
-    if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
-      return false;
-    }
-    return isFresh(comment);
-  });
-  const eyesReaction = observedReactions.find((reaction) => {
-    if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
-      return false;
-    }
-    return isFresh(reaction);
-  });
+  const progressComment = latestByDate(
+    snapshot.issueComments.filter((comment) => {
+      if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
+        return false;
+      }
+      return isFresh(comment);
+    }),
+    (comment) => comment.createdAt,
+  );
+  const eyesReaction = latestByDate(
+    observedReactions.filter((reaction) => {
+      if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
+        return false;
+      }
+      return isFresh(reaction);
+    }),
+    (reaction) => reaction.createdAt,
+  );
   const currentHeadLiveness = Boolean(progressComment ?? eyesReaction);
 
   const unresolvedThreads = snapshot.threads.filter(

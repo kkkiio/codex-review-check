@@ -225,6 +225,24 @@ test("lenient mode waits when a review started after the latest verdict", () => 
   assert.equal(currentReviewPlusNewEyes.signal, "eyes");
 });
 
+test("the newest same-kind liveness artifact wins the timestamp comparison", () => {
+  const multiProgress = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.progressComment, fixtures.followUpProgressComment],
+  });
+  assert.equal(multiProgress.phase, "reviewing");
+  assert.equal(multiProgress.signal, "progress-comment");
+
+  const multiEyes = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    reactions: [fixtures.eyes, fixtures.followUpEyes],
+  });
+  assert.equal(multiEyes.phase, "reviewing");
+  assert.equal(multiEyes.signal, "eyes");
+});
+
 test("every unresolved Codex thread blocks, including outdated threads, in both modes", () => {
   for (const requireLgtm of [false, true]) {
     const blocked = evaluate(
