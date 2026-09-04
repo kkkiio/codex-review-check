@@ -254,7 +254,7 @@ export function evaluateReviewState(
       unresolvedThreads,
       currentHeadTerminal: false,
       currentHeadLiveness,
-      terminalAt: null,
+      terminalAt: latestTerminalAt,
     };
   }
 

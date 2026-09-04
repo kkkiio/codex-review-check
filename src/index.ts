@@ -188,6 +188,13 @@ async function run(): Promise<void> {
         return;
       }
     } else if (evaluation.phase === "awaiting-lgtm") {
+      // Same settle-window rule as the terminal phase: a newer same-HEAD
+      // review gets its own propagation window before lgtm-missing fires.
+      if (evaluation.terminalAt !== terminalEvidenceAt) {
+        terminalEvidenceAt = evaluation.terminalAt;
+        terminalSeenAt = Date.now();
+        core.info("Accepted terminal verdict changed; restarting the settle window.");
+      }
       terminalSeenAt ??= Date.now();
     } else {
       terminalSeenAt = null;
