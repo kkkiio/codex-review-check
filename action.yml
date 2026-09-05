@@ -1,5 +1,5 @@
 name: Codex Review Check
-description: Block unresolved Codex review threads and optionally require a current-HEAD Codex LGTM, without requesting a review automatically.
+description: Block unresolved Codex review threads and optionally require Codex approval for the latest commit.
 author: xieziheng
 
 branding:
