@@ -65,8 +65,8 @@ And its evaluation order — each evaluation stops at the first match:
 
 ```text
 1 · unresolved Codex threads    → fail · fix, or reply with reasoning and resolve
-2 · a newer review is running   → wait (📝 Code Review on HEAD · 🔄 Running, not yet ✅ Completed)
-3 · completed verdict           → pass
+2 · a newer review is running   → wait (📝 Code Review on HEAD · 🔄 Running)
+3 · completed verdict           → pass (usually ✅ Completed)
       lenient (default):  latest verdict, any HEAD
       require-lgtm:       LGTM on the current HEAD — a verdict without an LGTM fails with a re-review hint after grace + settle
 4 · nothing after grace-seconds → fail · @codex review hint
