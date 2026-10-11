@@ -24,7 +24,7 @@ When `gh pr checks` reports a failure, the failure log line gives the agent one 
 ```console
 $ gh run view --log-failed
 ...
-##[error]No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0. Run: gh pr comment 42 --body '@codex review' — then re-run: gh run rerun 33499862152 --failed
+##[error]No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0. Request one and run these back to back, without waiting in between: gh pr comment 42 --body '@codex review' && gh run rerun 33499862152 --failed && gh pr checks 42 --watch. The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong.
 ```
 
 The job summary mirrors the same guidance in the web UI for human debugging.

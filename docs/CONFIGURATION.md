@@ -86,11 +86,12 @@ The Action infers this number from pull request, review, review-comment, and pul
 
 ## Reruns
 
-The missing-review failure prints both commands in the job log and the job summary:
+Every failure prints its next steps as one chain in the failure log line and as a command block in the job summary. The missing-review failure, for example, prints:
 
 ```shell
-gh pr comment 42 --body '@codex review'
-gh run rerun RUN_ID --failed
+gh pr comment 42 --body '@codex review' && gh run rerun RUN_ID --failed && gh pr checks 42 --watch
 ```
+
+Run the commands back to back. The rerun attempt is the step that waits for Codex: it polls for up to `review-timeout-seconds`, which the message states, and then passes or prints the next action. `gh pr checks --watch` waits on that attempt. Post the review request before the rerun; a request comment newer than every Codex artifact keeps the attempt waiting until the review starts. Reading Codex reviews or comments directly remains useful when the check result looks wrong.
 
 A rerun reconstructs the PR state and reads its live `head.sha`, reviews, comments, reactions, and threads. It does not depend on a resolve webhook. GitHub still executes the Action version pinned by the original workflow run; update the workflow pin and trigger a new run when adopting a newer Action release.

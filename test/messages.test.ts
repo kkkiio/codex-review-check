@@ -4,6 +4,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import {
   failureOutput,
+  type MessageOptions,
   suggestsReviewRequest,
   summaryMarkdown,
   type FailureReason,
@@ -29,6 +30,10 @@ function expectFixture(name: string, actual: string): void {
 }
 
 const RUN_ID = "33499862152";
+
+function messageOptions(reviewHint: ReviewHintPolicy, requireLgtm = false): MessageOptions {
+  return { runId: RUN_ID, reviewHint, requireLgtm, reviewTimeoutSeconds: 1800 };
+}
 
 const snapshot: ReviewSnapshot = {
   repository: "owner/repo",
@@ -78,14 +83,8 @@ function composite(
   reviewHint: ReviewHintPolicy,
   requireLgtm = false,
 ): string {
-  const output = failureOutput(
-    reason,
-    snapshot,
-    evaluation,
-    RUN_ID,
-    reviewHint,
-    requireLgtm,
-  );
+  const options = messageOptions(reviewHint, requireLgtm);
+  const output = failureOutput(reason, snapshot, evaluation, options);
   return [
     "=== annotation (core.setFailed — the line agents read via gh run view --log-failed) ===",
     output.annotation,
@@ -94,15 +93,7 @@ function composite(
     ...(output.logLines.length > 0 ? output.logLines : ["(none)"]),
     "",
     "=== job summary (web UI only) ===",
-    summaryMarkdown(
-      snapshot,
-      evaluation,
-      "failure",
-      reason,
-      RUN_ID,
-      reviewHint,
-      requireLgtm,
-    ),
+    summaryMarkdown(snapshot, evaluation, "failure", reason, options),
   ].join("\n");
 }
 
@@ -227,8 +218,7 @@ test("ready lenient success summary is the default", () => {
     evaluation({ phase: "terminal", signal: "review:commented", currentHeadTerminal: true }),
     "success",
     "ready",
-    RUN_ID,
-    "suggest",
+    messageOptions("suggest"),
   );
   expectFixture("ready", ready);
 });
@@ -241,8 +231,7 @@ test("ready lenient success summary reports an observed LGTM", () => {
       evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
       "success",
       "ready",
-      RUN_ID,
-      "suggest",
+      messageOptions("suggest"),
     ),
   );
 });
@@ -255,9 +244,7 @@ test("ready strict success summary", () => {
       evaluation({ phase: "terminal", signal: "clean-reaction", currentHeadTerminal: true }),
       "success",
       "ready",
-      RUN_ID,
-      "suggest",
-      true,
+      messageOptions("suggest", true),
     ),
   );
 });
@@ -272,12 +259,22 @@ test("review-hint output matches the annotation guidance", () => {
   ];
   for (const [reason, state] of scenarios) {
     for (const policy of ["suggest", "suppress"] as const) {
-      const output = failureOutput(reason, snapshot, state, RUN_ID, policy);
+      const output = failureOutput(reason, snapshot, state, messageOptions(policy));
       assert.equal(
         suggestsReviewRequest(reason, state, policy),
         output.annotation.includes("'@codex review'"),
         `${reason} terminal=${state.currentHeadTerminal} liveness=${state.currentHeadLiveness} policy=${policy}`,
       );
     }
+  }
+});
+
+test("rerun guidance states the configured review timeout", () => {
+  for (const [seconds, text] of [[600, "up to 10 min"], [90, "up to 90s"]] as const) {
+    const output = failureOutput("review-timeout", snapshot, evaluation({ phase: "reviewing" }), {
+      ...messageOptions("suggest"),
+      reviewTimeoutSeconds: seconds,
+    });
+    assert.ok(output.annotation.includes(text), output.annotation);
   }
 });

@@ -37,14 +37,45 @@ export interface FailureOutput {
   annotation: string;
 }
 
-export function rerunCommand(runId: string | undefined): string {
-  return runId
-    ? `gh run rerun ${runId} --failed`
-    : "Re-run the failed Codex Review job from GitHub Actions.";
+/** Run-level settings that shape the next-action guidance. */
+export interface MessageOptions {
+  runId: string | undefined;
+  reviewHint: ReviewHintPolicy;
+  requireLgtm: boolean;
+  reviewTimeoutSeconds: number;
 }
 
 export function reviewRequestCommand(pullRequest: number): string {
   return `gh pr comment ${pullRequest} --body '@codex review'`;
+}
+
+/**
+ * The next-action commands in run order: an optional review request, the rerun, and
+ * the check watch. The rerun is the step that waits for Codex, so the commands are
+ * chained rather than separated by an external wait.
+ */
+export function nextStepCommands(
+  pullRequest: number,
+  runId: string | undefined,
+  requestReview: boolean,
+): string[] {
+  return [
+    ...(requestReview ? [reviewRequestCommand(pullRequest)] : []),
+    runId ? `gh run rerun ${runId} --failed` : "re-run the failed Codex Review job from GitHub Actions",
+    `gh pr checks ${pullRequest} --watch`,
+  ];
+}
+
+/** Explain that the rerun owns the wait, with the configured timeout. */
+export function rerunWaitGuidance(reviewTimeoutSeconds: number): string {
+  const timeout =
+    reviewTimeoutSeconds >= 60 && reviewTimeoutSeconds % 60 === 0
+      ? `${reviewTimeoutSeconds / 60} min`
+      : `${reviewTimeoutSeconds}s`;
+  return (
+    `The re-run check itself waits up to ${timeout} for the Codex review to finish, then passes or reports the next action. ` +
+    "Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong."
+  );
 }
 
 function threadLocation(thread: ReviewThreadRecord): string {
@@ -67,11 +98,13 @@ export function failureOutput(
   reason: FailureReason,
   snapshot: ReviewSnapshot,
   evaluation: ReviewEvaluation,
-  runId: string | undefined,
-  reviewHint: ReviewHintPolicy,
-  requireLgtm = false,
+  options: MessageOptions,
 ): FailureOutput {
-  const rerun = rerunCommand(runId);
+  const requestReview = suggestsReviewRequest(reason, evaluation, options.reviewHint);
+  const steps =
+    "run these back to back, without waiting in between: " +
+    `${nextStepCommands(snapshot.pullRequest, options.runId, requestReview).join(" && ")}. ` +
+    rerunWaitGuidance(options.reviewTimeoutSeconds);
   if (reason === "unresolved-threads") {
     const logLines = evaluation.unresolvedThreads.map((thread) => {
       const suffix = thread.isOutdated ? " (outdated)" : "";
@@ -82,8 +115,8 @@ export function failureOutput(
       return {
         logLines,
         annotation:
-          `${count} ${auditTrailGuidance} Then re-run: ${rerun}. ` +
-          "If you already resolved them after this run started, no further action is needed — just re-run.",
+          `${count} ${auditTrailGuidance} Then ${steps} ` +
+          "If you already resolved them after this run started, skip straight to these commands.",
       };
     }
     if (evaluation.currentHeadLiveness) {
@@ -91,66 +124,61 @@ export function failureOutput(
         logLines,
         annotation:
           `${count} A Codex review of the current HEAD is already in progress. ${auditTrailGuidance} ` +
-          `Then re-run: ${rerun}. ` +
-          "If you already resolved them after this run started, no further action is needed — just re-run.",
+          `Then ${steps} If you already resolved them after this run started, skip straight to these commands.`,
       };
     }
-    if (reviewHint === "suggest") {
+    if (requestReview) {
       return {
         logLines,
         annotation:
-          `${count} The current HEAD has no Codex review yet. ${auditTrailGuidance} ` +
-          `Then request a fresh review: ${reviewRequestCommand(snapshot.pullRequest)} — then re-run: ${rerun}. ` +
-          "If you already resolved the threads after this run started, start with the review request.",
+          `${count} Codex has not reviewed the current HEAD yet. ${auditTrailGuidance} Then ${steps} ` +
+          "If you already resolved the threads after this run started, skip straight to these commands.",
       };
     }
     return {
       logLines,
       annotation:
-        `${count} ${auditTrailGuidance} Then re-run: ${rerun}. ` +
+        `${count} ${auditTrailGuidance} Then ${steps} ` +
         "Codex is expected to review each push automatically; if no review for the current HEAD arrives, check the connector configuration.",
     };
   }
   if (reason === "review-missing") {
-    if (reviewHint === "suggest") {
+    if (requestReview) {
       return {
         logLines: [],
-        annotation:
-          `No Codex review signal for current HEAD ${snapshot.headSha}. ` +
-          `Run: ${reviewRequestCommand(snapshot.pullRequest)} — then re-run: ${rerun}`,
+        annotation: `No Codex review signal for current HEAD ${snapshot.headSha}. Request one and ${steps}`,
       };
     }
     return {
       logLines: [],
       annotation:
         `No Codex review signal for current HEAD ${snapshot.headSha}. ` +
-        "This setup expects Codex to review each push automatically — verify the connector triggered for this HEAD, " +
-        `then re-run: ${rerun}`,
+        `This setup expects Codex to review each push automatically — verify the connector triggered for this HEAD, then ${steps}`,
     };
   }
   if (reason === "lgtm-missing") {
     const message =
       `Codex reviewed the current HEAD ${snapshot.headSha} but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).`;
-    if (reviewHint === "suggest") {
+    if (requestReview) {
       return {
         logLines: [message],
         annotation:
-          `${message} Request a fresh review after handling its threads: ${reviewRequestCommand(snapshot.pullRequest)} — ` +
-          `then re-run: ${rerun}. Or drop require-lgtm to accept a completed review without an LGTM.`,
+          `${message} After handling its threads, request a fresh review and ${steps} ` +
+          "Or drop require-lgtm to accept a completed review without an LGTM.",
       };
     }
     return {
       logLines: [message],
       annotation:
-        `${message} Verify the connector triggered a fresh review after handling its threads, then re-run: ${rerun}. ` +
+        `${message} Verify the connector triggered a fresh review after handling its threads, then ${steps} ` +
         "Or drop require-lgtm to accept a completed review without an LGTM.",
     };
   }
   return {
     logLines: [],
     annotation:
-      "Codex review did not produce a terminal current-HEAD signal before timeout. " +
-      `Re-run after the review finishes: ${rerun}`,
+      `A Codex review of current HEAD ${snapshot.headSha} started but produced no terminal signal before the timeout. ` +
+      `To keep waiting, ${steps}`,
   };
 }
 
@@ -160,11 +188,8 @@ export function summaryMarkdown(
   evaluation: ReviewEvaluation,
   state: "success" | "failure",
   reason: string,
-  runId: string | undefined,
-  reviewHint: ReviewHintPolicy,
-  requireLgtm = false,
+  options: MessageOptions,
 ): string {
-  const rerun = rerunCommand(runId);
   const lines = [
     "# Codex Review",
     "",
@@ -173,24 +198,15 @@ export function summaryMarkdown(
     `| [${snapshot.repository}#${snapshot.pullRequest}](${snapshot.pullRequestUrl}) | \`${snapshot.headSha}\` | ${state} | ${evaluation.signal} |`,
     "",
   ];
+  const requestReview = suggestsReviewRequest(reason, evaluation, options.reviewHint);
   if (reason === "review-missing") {
-    if (reviewHint === "suggest") {
+    if (requestReview) {
       lines.push(
         "## Agent next action",
         "",
         "No Codex review signal was found for the current PR HEAD after the grace period.",
         "",
-        "Request one explicitly; this Action will not spend Codex credits for you.",
-        "",
-        "```shell",
-        reviewRequestCommand(snapshot.pullRequest),
-        "```",
-        "",
-        "Then re-run the failed check:",
-        "",
-        "```shell",
-        rerun,
-        "```",
+        "Request one explicitly; this Action will not spend Codex credits for you. Run these back to back, without waiting in between:",
       );
     } else {
       lines.push(
@@ -198,11 +214,7 @@ export function summaryMarkdown(
         "",
         "No Codex review signal was found for the current PR HEAD after the grace period.",
         "",
-        "This setup expects Codex to review each push automatically, so no manual review request is suggested. Verify the connector triggered for this HEAD, then re-run the failed check:",
-        "",
-        "```shell",
-        rerun,
-        "```",
+        "This setup expects Codex to review each push automatically, so no manual review request is suggested. Verify the connector triggered for this HEAD, then run:",
       );
     }
   } else if (reason === "unresolved-threads") {
@@ -218,90 +230,35 @@ export function summaryMarkdown(
       const suffix = thread.isOutdated ? " (outdated)" : "";
       lines.push(`- ${url ? `[${location}](${url})` : location}${suffix}`);
     }
-    lines.push("");
-    if (evaluation.currentHeadTerminal) {
-      lines.push(
-        "The terminal pass-condition is already satisfied. After the threads are handled, re-run the failed job to re-evaluate the live state:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    } else if (evaluation.currentHeadLiveness) {
-      lines.push(
-        "A Codex review of the current HEAD is already in progress, so no new review request is needed. After the threads are handled, re-run the failed job:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    } else if (reviewHint === "suggest") {
-      lines.push(
-        "The current HEAD also has no Codex review yet. After the threads are handled, request a fresh review:",
-        "",
-        "```shell",
-        reviewRequestCommand(snapshot.pullRequest),
-        "```",
-        "",
-        "Then re-run the failed check:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    } else {
-      lines.push(
-        "Codex is expected to review each push automatically, so no manual review request is suggested. After the threads are handled, verify the connector and re-run the failed job:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    }
+    lines.push(
+      "",
+      evaluation.currentHeadTerminal
+        ? "The terminal pass-condition is already satisfied. After the threads are handled, re-run the failed job to re-evaluate the live state:"
+        : evaluation.currentHeadLiveness
+          ? "A Codex review of the current HEAD is already in progress, so no new review request is needed. After the threads are handled, re-run the failed job:"
+          : requestReview
+            ? "Codex has not reviewed the current HEAD yet. After the threads are handled, run these back to back, without waiting in between:"
+            : "Codex is expected to review each push automatically, so no manual review request is suggested. After the threads are handled, verify the connector and re-run the failed job:",
+    );
   } else if (reason === "lgtm-missing") {
     lines.push(
       "## LGTM missing",
       "",
       `Codex reviewed the current HEAD \`${snapshot.headSha}\` but left no LGTM (a 👍 reaction or a \'Didn't find any major issues\' comment).`,
       "",
+      requestReview
+        ? "After handling its threads, request a fresh review and re-run the failed check, back to back:"
+        : "Verify the connector triggered a fresh review after handling its threads, then re-run the failed check:",
     );
-    if (reviewHint === "suggest") {
-      lines.push(
-        "Request a fresh review after handling its threads:",
-        "",
-        "```shell",
-        reviewRequestCommand(snapshot.pullRequest),
-        "```",
-        "",
-        "Then re-run the failed check:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    } else {
-      lines.push(
-        "Verify the connector triggered a fresh review after handling its threads, then re-run the failed check:",
-        "",
-        "```shell",
-        rerun,
-        "```",
-      );
-    }
-    lines.push("", "Or drop `require-lgtm` to accept a completed review without an LGTM.");
   } else if (reason === "review-timeout") {
     lines.push(
       "## Review still in progress",
       "",
-      "Codex liveness was observed, but no terminal current-HEAD result arrived before the configured timeout. Re-run the check after the review finishes.",
-      "",
-      "```shell",
-      rerun,
-      "```",
+      "Codex liveness was observed, but no terminal current-HEAD result arrived before the configured timeout. Re-run the check to keep waiting:",
     );
   } else {
     lines.push("## Ready", "");
-    if (!requireLgtm) {
+    if (!options.requireLgtm) {
       const lgtmObserved =
         evaluation.signal === "clean-comment" || evaluation.signal === "clean-reaction";
       lines.push(
@@ -313,6 +270,19 @@ export function summaryMarkdown(
       lines.push(
         "Codex left an LGTM attesting the current HEAD and no unresolved Codex review thread blocks.",
       );
+    }
+  }
+  if (state === "failure") {
+    lines.push(
+      "",
+      "```shell",
+      nextStepCommands(snapshot.pullRequest, options.runId, requestReview).join(" && "),
+      "```",
+      "",
+      rerunWaitGuidance(options.reviewTimeoutSeconds),
+    );
+    if (reason === "lgtm-missing") {
+      lines.push("", "Or drop `require-lgtm` to accept a completed review without an LGTM.");
     }
   }
   return `${lines.join("\n")}\n`;

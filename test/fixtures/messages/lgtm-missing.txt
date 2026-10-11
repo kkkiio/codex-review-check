@@ -1,5 +1,5 @@
 === annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
-Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment). Request a fresh review after handling its threads: gh pr comment 42 --body '@codex review' — then re-run: gh run rerun 33499862152 --failed. Or drop require-lgtm to accept a completed review without an LGTM.
+Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment). After handling its threads, request a fresh review and run these back to back, without waiting in between: gh pr comment 42 --body '@codex review' && gh run rerun 33499862152 --failed && gh pr checks 42 --watch. The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong. Or drop require-lgtm to accept a completed review without an LGTM.
 
 === job log lines (core.info) ===
 Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).
@@ -15,16 +15,12 @@ Codex reviewed the current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0 but lef
 
 Codex reviewed the current HEAD `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` but left no LGTM (a 👍 reaction or a 'Didn't find any major issues' comment).
 
-Request a fresh review after handling its threads:
+After handling its threads, request a fresh review and re-run the failed check, back to back:
 
 ```shell
-gh pr comment 42 --body '@codex review'
+gh pr comment 42 --body '@codex review' && gh run rerun 33499862152 --failed && gh pr checks 42 --watch
 ```
 
-Then re-run the failed check:
-
-```shell
-gh run rerun 33499862152 --failed
-```
+The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong.
 
 Or drop `require-lgtm` to accept a completed review without an LGTM.
