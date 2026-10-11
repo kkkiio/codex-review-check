@@ -276,7 +276,7 @@ export function summaryMarkdown(
     lines.push(
       "",
       "```shell",
-      ...nextStepCommands(snapshot.pullRequest, options.runId, requestReview),
+      nextStepCommands(snapshot.pullRequest, options.runId, requestReview).join(" && "),
       "```",
       "",
       rerunWaitGuidance(options.reviewTimeoutSeconds),
