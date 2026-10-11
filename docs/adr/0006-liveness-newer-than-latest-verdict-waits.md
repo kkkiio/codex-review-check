@@ -1,6 +1,6 @@
 # ADR 0006: A review started after the latest verdict keeps the gate waiting
 
-- Status: Accepted
+- Status: Accepted; liveness source superseded by [ADR 0008](0008-summary-row-is-the-liveness-signal.md)
 - Date: 2026-09-04
 
 ## Context

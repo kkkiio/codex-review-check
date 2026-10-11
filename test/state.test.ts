@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { evaluateReviewState, parseCodexIssueComment } from "../src/state.js";
+import { evaluateReviewState, parseCodexIssueComment, parseCodexReviewSummary } from "../src/state.js";
 import type {
   IssueCommentRecord,
   ReactionRecord,
@@ -13,17 +13,19 @@ import type {
 
 interface Fixtures {
   base: ReviewSnapshot;
-  eyes: ReactionRecord;
-  staleEyes: ReactionRecord;
-  followUpEyes: ReactionRecord;
   cleanReaction: ReactionRecord;
   staleCleanReaction: ReactionRecord;
   cleanComment: IssueCommentRecord;
   mismatchedCleanComment: IssueCommentRecord;
-  progressComment: IssueCommentRecord;
-  followUpProgressComment: IssueCommentRecord;
-  reviewRequestComment: IssueCommentRecord;
-  completedReviewRequestComment: IssueCommentRecord;
+  summaryRunning: IssueCommentRecord;
+  summaryCompleted: IssueCommentRecord;
+  summaryFollowUpRunning: IssueCommentRecord;
+  summaryOldCommitRunning: IssueCommentRecord;
+  summarySecurityRunning: IssueCommentRecord;
+  summaryUnknownStatus: IssueCommentRecord;
+  reviewRequest: IssueCommentRecord;
+  securityReviewRequest: IssueCommentRecord;
+  errorComment: IssueCommentRecord;
   terminalReview: ReviewRecord;
   oldReview: ReviewRecord;
   unresolvedThread: ReviewThreadRecord;
@@ -37,16 +39,20 @@ const bots = new Set(["chatgpt-codex-connector", "chatgpt-codex-connector[bot]"]
 const evaluate = (snapshot: ReviewSnapshot, requireLgtm = false) =>
   evaluateReviewState(snapshot, bots, requireLgtm);
 
-test("Codex issue comments expose only supported clean and progress signals", () => {
+test("Codex issue comments expose only the supported clean signal", () => {
   const clean = parseCodexIssueComment(fixtures.cleanComment);
   assert.equal(clean.kind, "terminal");
   assert.equal(clean.name, "clean-comment");
   assert.equal(clean.commitRef, "aaaaaaaaaa");
 
-  const progress = parseCodexIssueComment(fixtures.progressComment);
-  assert.equal(progress.kind, "liveness");
-  assert.equal(progress.name, "progress-comment");
-  assert.equal(progress.commitRef, null);
+  const legacyProgress = parseCodexIssueComment({
+    ...fixtures.cleanComment,
+    body: "👀 Codex Review still in progress: analyzing tests",
+  });
+  assert.equal(legacyProgress.kind, "none");
+
+  const summary = parseCodexIssueComment(fixtures.summaryCompleted);
+  assert.equal(summary.kind, "none");
 
   const prose = parseCodexIssueComment({
     ...fixtures.cleanComment,
@@ -67,22 +73,55 @@ test("Codex issue comments expose only supported clean and progress signals", ()
   assert.equal(duplicatedMarker.kind, "none");
 });
 
+test("the review summary comment parses into one row per review kind", () => {
+  assert.deepEqual(parseCodexReviewSummary(fixtures.summarySecurityRunning), [
+    {
+      review: "Code Review",
+      status: "completed",
+      at: "2026-08-31T10:02:04.123456Z",
+      commitRef: "aaaaaaa",
+      trigger: "PR opened",
+    },
+    {
+      review: "Security Review",
+      status: "running",
+      at: "2026-08-31T10:02:30.123456Z",
+      commitRef: "aaaaaaa",
+      trigger: "PR opened",
+    },
+  ]);
+  assert.equal(parseCodexReviewSummary(fixtures.summaryUnknownStatus)?.[0]?.status, "unknown");
+  assert.equal(parseCodexReviewSummary(fixtures.cleanComment), null);
+  assert.equal(
+    parseCodexReviewSummary({
+      ...fixtures.summaryRunning,
+      body: fixtures.summaryRunning.body.replace("<!-- codex-pull-request-review-summary -->", ""),
+    }),
+    null,
+  );
+});
+
 test("strict mode requires a current-HEAD LGTM", () => {
   const strictEvaluate = (snapshot: ReviewSnapshot) => evaluate(snapshot, true);
   assert.equal(strictEvaluate(fixtures.base).phase, "missing");
-  assert.equal(strictEvaluate({ ...fixtures.base, reactions: [fixtures.staleEyes] }).phase, "missing");
+  assert.equal(
+    strictEvaluate({ ...fixtures.base, issueComments: [fixtures.summaryOldCommitRunning] }).phase,
+    "missing",
+  );
   assert.equal(
     strictEvaluate({ ...fixtures.base, reactions: [fixtures.staleCleanReaction] }).phase,
     "missing",
   );
 
-  const reviewing = strictEvaluate({ ...fixtures.base, reactions: [fixtures.eyes] });
+  const reviewing = strictEvaluate({ ...fixtures.base, issueComments: [fixtures.summaryRunning] });
   assert.equal(reviewing.phase, "reviewing");
-  assert.equal(reviewing.signal, "eyes");
+  assert.equal(reviewing.signal, "summary:running");
 
-  const progress = strictEvaluate({ ...fixtures.base, issueComments: [fixtures.progressComment] });
-  assert.equal(progress.phase, "reviewing");
-  assert.equal(progress.signal, "progress-comment");
+  const completedRowOnly = strictEvaluate({
+    ...fixtures.base,
+    issueComments: [fixtures.summaryCompleted],
+  });
+  assert.equal(completedRowOnly.phase, "missing");
 
   const withFindings = strictEvaluate({ ...fixtures.base, reviews: [fixtures.terminalReview] });
   assert.equal(withFindings.phase, "awaiting-lgtm");
@@ -103,13 +142,6 @@ test("strict mode requires a current-HEAD LGTM", () => {
   assert.equal(cleanReaction.phase, "terminal");
   assert.equal(cleanReaction.signal, "clean-reaction");
 
-  const requestCommentClean = strictEvaluate({
-    ...fixtures.base,
-    issueComments: [fixtures.completedReviewRequestComment],
-  });
-  assert.equal(requestCommentClean.phase, "terminal");
-  assert.equal(requestCommentClean.signal, "clean-reaction");
-
   const mismatchedClean = strictEvaluate({
     ...fixtures.base,
     issueComments: [fixtures.mismatchedCleanComment],
@@ -117,39 +149,28 @@ test("strict mode requires a current-HEAD LGTM", () => {
   assert.equal(mismatchedClean.phase, "missing");
 });
 
-test("strict mode lets follow-up review liveness supersede a completed review", () => {
-  const followUpEyes = evaluate(
+test("strict mode waits for a follow-up review of an already reviewed HEAD", () => {
+  const followUp = evaluate(
     {
       ...fixtures.base,
       reviews: [fixtures.terminalReview],
-      reactions: [fixtures.followUpEyes],
+      issueComments: [fixtures.summaryFollowUpRunning],
     },
     true,
   );
-  assert.equal(followUpEyes.phase, "reviewing");
-  assert.equal(followUpEyes.signal, "eyes");
+  assert.equal(followUp.phase, "reviewing");
+  assert.equal(followUp.signal, "summary:running");
 
-  const followUpProgress = evaluate(
+  const completed = evaluate(
     {
       ...fixtures.base,
       reviews: [fixtures.terminalReview],
-      issueComments: [fixtures.followUpProgressComment],
+      issueComments: [fixtures.summaryCompleted],
     },
     true,
   );
-  assert.equal(followUpProgress.phase, "reviewing");
-  assert.equal(followUpProgress.signal, "progress-comment");
-
-  const leftoverEyes = evaluate(
-    {
-      ...fixtures.base,
-      reviews: [fixtures.terminalReview],
-      reactions: [fixtures.eyes],
-    },
-    true,
-  );
-  assert.equal(leftoverEyes.phase, "awaiting-lgtm");
-  assert.equal(leftoverEyes.signal, "review:commented");
+  assert.equal(completed.phase, "awaiting-lgtm");
+  assert.equal(completed.signal, "review:commented");
 });
 
 test("lenient mode accepts stale terminal evidence of any supported kind", () => {
@@ -192,55 +213,54 @@ test("lenient mode reports the freshest verdict across evidence kinds", () => {
   assert.equal(reviewAfterCleanComment.signal, "review:commented");
 });
 
-test("lenient mode waits when a review started after the latest verdict", () => {
-  const staleReviewPlusEyes = evaluate({
+test("lenient mode waits while the current-HEAD Code Review row is running", () => {
+  const staleReviewPlusRunning = evaluate({
     ...fixtures.base,
     reviews: [fixtures.oldReview],
-    reactions: [fixtures.eyes],
+    issueComments: [fixtures.summaryRunning],
   });
-  assert.equal(staleReviewPlusEyes.phase, "reviewing");
-  assert.equal(staleReviewPlusEyes.signal, "eyes");
+  assert.equal(staleReviewPlusRunning.phase, "reviewing");
+  assert.equal(staleReviewPlusRunning.signal, "summary:running");
 
-  const staleReviewPlusStaleEyes = evaluate({
+  const staleReviewPlusOldCommitRow = evaluate({
     ...fixtures.base,
     reviews: [fixtures.oldReview],
-    reactions: [fixtures.staleEyes],
+    issueComments: [fixtures.summaryOldCommitRunning],
   });
-  assert.equal(staleReviewPlusStaleEyes.phase, "terminal");
+  assert.equal(staleReviewPlusOldCommitRow.phase, "terminal");
 
-  const currentReviewPlusLeftoverEyes = evaluate({
+  const currentReviewPlusCompletedRow = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
-    reactions: [fixtures.eyes],
+    issueComments: [fixtures.summaryCompleted],
   });
-  assert.equal(currentReviewPlusLeftoverEyes.phase, "terminal");
-  assert.equal(currentReviewPlusLeftoverEyes.signal, "review:commented");
+  assert.equal(currentReviewPlusCompletedRow.phase, "terminal");
+  assert.equal(currentReviewPlusCompletedRow.signal, "review:commented");
 
-  const currentReviewPlusNewEyes = evaluate({
+  const currentReviewPlusFollowUp = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
-    reactions: [fixtures.followUpEyes],
+    issueComments: [fixtures.summaryFollowUpRunning],
   });
-  assert.equal(currentReviewPlusNewEyes.phase, "reviewing");
-  assert.equal(currentReviewPlusNewEyes.signal, "eyes");
+  assert.equal(currentReviewPlusFollowUp.phase, "reviewing");
 });
 
-test("the newest same-kind liveness artifact wins the timestamp comparison", () => {
-  const multiProgress = evaluate({
+test("only the Code Review row gates; an unknown status fails closed", () => {
+  const securityRunning = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
-    issueComments: [fixtures.progressComment, fixtures.followUpProgressComment],
+    issueComments: [fixtures.summarySecurityRunning],
   });
-  assert.equal(multiProgress.phase, "reviewing");
-  assert.equal(multiProgress.signal, "progress-comment");
+  assert.equal(securityRunning.phase, "terminal");
+  assert.equal(securityRunning.currentHeadLiveness, false);
 
-  const multiEyes = evaluate({
+  const unknownStatus = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
-    reactions: [fixtures.eyes, fixtures.followUpEyes],
+    issueComments: [fixtures.summaryUnknownStatus],
   });
-  assert.equal(multiEyes.phase, "reviewing");
-  assert.equal(multiEyes.signal, "eyes");
+  assert.equal(unknownStatus.phase, "reviewing");
+  assert.equal(unknownStatus.signal, "summary:unknown");
 });
 
 test("terminal results expose the selected artifact timestamp", () => {
@@ -278,7 +298,7 @@ test("blocked results discount terminal evidence when a newer review is running"
   const blocked = evaluate({
     ...fixtures.base,
     reviews: [fixtures.terminalReview],
-    reactions: [fixtures.followUpEyes],
+    issueComments: [fixtures.summaryFollowUpRunning],
     threads: [fixtures.unresolvedThread],
   });
   assert.equal(blocked.phase, "blocked");
@@ -327,7 +347,7 @@ test("blocked results expose the configured terminal pass-condition", () => {
 test("blocked results preserve current-HEAD liveness", () => {
   const reviewRunning = evaluate({
     ...fixtures.base,
-    reactions: [fixtures.eyes],
+    issueComments: [fixtures.summaryRunning],
     threads: [fixtures.unresolvedThread],
   });
   assert.equal(reviewRunning.phase, "blocked");
@@ -336,4 +356,55 @@ test("blocked results preserve current-HEAD liveness", () => {
   const noReview = evaluate({ ...fixtures.base, threads: [fixtures.unresolvedThread] });
   assert.equal(noReview.phase, "blocked");
   assert.equal(noReview.currentHeadLiveness, false);
+});
+
+test("a review request waits until Codex shows any activity after it", () => {
+  const pending = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    issueComments: [fixtures.summaryCompleted, fixtures.reviewRequest],
+  });
+  assert.equal(pending.phase, "reviewing");
+  assert.equal(pending.signal, "review-requested");
+  assert.equal(pending.currentHeadLiveness, true);
+
+  const strictPending = evaluate(
+    {
+      ...fixtures.base,
+      reactions: [fixtures.cleanReaction],
+      issueComments: [fixtures.reviewRequest],
+    },
+    true,
+  );
+  assert.equal(strictPending.phase, "reviewing");
+
+  const pickedUp = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.summaryCompleted, { ...fixtures.reviewRequest, createdAt: "2026-08-31T10:01:30Z" }],
+  });
+  assert.equal(pickedUp.phase, "terminal");
+
+  const errored = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    issueComments: [fixtures.reviewRequest, fixtures.errorComment],
+  });
+  assert.equal(errored.phase, "terminal");
+  assert.equal(errored.signal, "review:commented");
+});
+
+test("security review requests and connector text do not count as review requests", () => {
+  for (const comment of [
+    fixtures.securityReviewRequest,
+    { ...fixtures.reviewRequest, author: "chatgpt-codex-connector[bot]" },
+  ]) {
+    const evaluation = evaluate({
+      ...fixtures.base,
+      reviews: [fixtures.oldReview],
+      issueComments: [comment],
+    });
+    assert.equal(evaluation.phase, "terminal");
+    assert.equal(evaluation.currentHeadLiveness, false);
+  }
 });

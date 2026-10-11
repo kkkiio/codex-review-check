@@ -44,7 +44,7 @@ flowchart TB
     B -- unresolved --> C[Fail · fix, or reply with reasoning and resolve]
     C --> A
     B -- clear --> D{2 · new liveness}
-    D -- "👀 / progress" --> E[Wait for the verdict]
+    D -- "📝 Code Review on HEAD · 🔄 Running" --> E[Wait for the verdict]
     E --> A
     E -- "5 · review-timeout" --> J[Fail · review never finished]
     J --> A
@@ -65,8 +65,8 @@ And its evaluation order — each evaluation stops at the first match:
 
 ```text
 1 · unresolved Codex threads    → fail · fix, or reply with reasoning and resolve
-2 · a newer review is running   → wait (👀 / progress comment)
-3 · completed verdict           → pass
+2 · a newer review is running   → wait (📝 Code Review on HEAD · 🔄 Running, or a fresh @codex review)
+3 · completed verdict           → pass (usually ✅ Completed)
       lenient (default):  latest verdict, any HEAD
       require-lgtm:       LGTM on the current HEAD — a verdict without an LGTM fails with a re-review hint after grace + settle
 4 · nothing after grace-seconds → fail · @codex review hint

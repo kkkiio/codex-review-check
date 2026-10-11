@@ -44,11 +44,11 @@ Keep `cancel-in-progress: true` for the pull-request concurrency group so a new 
 
 The observable artifacts are documented in [CODEX_GITHUB_SIGNALS.md](CODEX_GITHUB_SIGNALS.md). Acceptance policy:
 
-- A review that started after the latest completed verdict keeps the job waiting in both modes, up to `review-timeout-seconds`: an in-flight review was paid for, so its result must land before the gate opens. Liveness predating the latest completed verdict is a leftover of that review and does not block.
+- While the Codex Review Summary comment shows the 📝 Code Review row on the current HEAD as anything other than ✅ Completed (normally 🔄 Running), the job keeps waiting in both modes, up to `review-timeout-seconds`: an in-flight review was paid for, so its result must land before the gate opens. An `@codex review` comment newer than every Codex artifact (the Code Review row time, verdicts, connector comments) also waits, because the row takes 10–20 s to switch to 🔄 Running and a stale verdict must not pass in that gap; a connector error comment ends that wait. A row naming an older commit does not block. The 🔒 Security Review row is not gated on. 👀 reactions are not read.
 - In the default lenient mode, the most recent completed terminal review, clean comment, or 👍 may satisfy the review condition even when it attests an older HEAD, once no unresolved Codex review thread remains.
 - With `require-lgtm: true`, Codex must leave an LGTM attesting the current HEAD, and no unresolved Codex review thread may remain.
 - A terminal review with `COMMENTED`, `CHANGES_REQUESTED`, or `APPROVED` state is not an LGTM, even when it has no findings.
-- Unknown presentation never produces success: the job keeps waiting while a known liveness signal exists, otherwise it fails with the printed guidance. GitHub API or pagination failures also fail the job.
+- Unknown presentation never produces success: a current-HEAD Code Review row with an unrecognized status keeps the job waiting; otherwise unrecognized artifacts are ignored and the job fails with the printed guidance when no accepted verdict exists. GitHub API or pagination failures also fail the job.
 
 ## LGTM requirement
 

@@ -135,39 +135,11 @@ export async function loadReviewSnapshot(
     content: reaction.content ?? "",
     createdAt: reaction.created_at ?? null,
   }));
-  const requestCommentReactions = new Map<number, ReactionRecord[]>();
-  await Promise.all(
-    rawIssueComments.map(async (comment) => {
-      if (!/@codex[ \t]+review\b/iu.test(comment.body ?? "")) {
-        return;
-      }
-      const commentReactions = await octokit.paginate(
-        octokit.rest.reactions.listForIssueComment,
-        {
-          owner,
-          repo,
-          comment_id: comment.id,
-          per_page: 100,
-        },
-      );
-      requestCommentReactions.set(
-        comment.id,
-        commentReactions.map((reaction) => ({
-          author: reaction.user?.login ?? "",
-          content: reaction.content ?? "",
-          createdAt: reaction.created_at ?? null,
-        })),
-      );
-    }),
-  );
   const issueComments: IssueCommentRecord[] = rawIssueComments.map((comment) => ({
     author: comment.user?.login ?? "",
-    authorType: comment.user?.type ?? null,
-    appSlug: comment.performed_via_github_app?.slug ?? null,
     body: comment.body ?? "",
     createdAt: comment.created_at ?? null,
     url: comment.html_url ?? null,
-    reactions: requestCommentReactions.get(comment.id) ?? [],
   }));
 
   const threads: ReviewThreadRecord[] = [];

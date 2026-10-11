@@ -177,7 +177,7 @@ test("review-timeout failure output", () => {
     "review-timeout",
     composite(
       "review-timeout",
-      evaluation({ phase: "reviewing", signal: "progress-comment" }),
+      evaluation({ phase: "reviewing", signal: "summary:running" }),
       "suggest",
     ),
   );

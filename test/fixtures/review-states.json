@@ -10,21 +10,6 @@
     "issueComments": [],
     "threads": []
   },
-  "eyes": {
-    "author": "chatgpt-codex-connector[bot]",
-    "content": "eyes",
-    "createdAt": "2026-08-31T10:00:05Z"
-  },
-  "staleEyes": {
-    "author": "chatgpt-codex-connector",
-    "content": "eyes",
-    "createdAt": "2026-08-31T09:59:59Z"
-  },
-  "followUpEyes": {
-    "author": "chatgpt-codex-connector[bot]",
-    "content": "eyes",
-    "createdAt": "2026-08-31T10:02:30Z"
-  },
   "cleanReaction": {
     "author": "chatgpt-codex-connector[bot]",
     "content": "+1",
@@ -37,69 +22,15 @@
   },
   "cleanComment": {
     "author": "chatgpt-codex-connector",
-    "authorType": "Bot",
-    "appSlug": "chatgpt-codex-connector",
     "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `aaaaaaaaaa`",
     "createdAt": "2026-08-31T10:01:00Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-1",
-    "reactions": []
+    "url": "https://github.com/example/project/pull/42#issuecomment-1"
   },
   "mismatchedCleanComment": {
     "author": "chatgpt-codex-connector",
-    "authorType": "Bot",
-    "appSlug": "chatgpt-codex-connector",
     "body": "Codex Review: Didn't find any major issues.\n\n**Reviewed commit:** `bbbbbbbbbb`",
     "createdAt": "2026-08-31T10:01:00Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-2",
-    "reactions": []
-  },
-  "progressComment": {
-    "author": "chatgpt-codex-connector",
-    "authorType": "Bot",
-    "appSlug": "chatgpt-codex-connector",
-    "body": "👀 Codex Review still in progress: analyzing tests",
-    "createdAt": "2026-08-31T10:00:10Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-3",
-    "reactions": []
-  },
-  "followUpProgressComment": {
-    "author": "chatgpt-codex-connector",
-    "authorType": "Bot",
-    "appSlug": "chatgpt-codex-connector",
-    "body": "👀 Codex Review still in progress: re-checking fixes",
-    "createdAt": "2026-08-31T10:02:45Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-6",
-    "reactions": []
-  },
-  "reviewRequestComment": {
-    "author": "example-maintainer",
-    "authorType": "User",
-    "appSlug": null,
-    "body": "@codex review",
-    "createdAt": "2026-08-31T10:00:05Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-4",
-    "reactions": [
-      {
-        "author": "chatgpt-codex-connector[bot]",
-        "content": "eyes",
-        "createdAt": "2026-08-31T10:00:10Z"
-      }
-    ]
-  },
-  "completedReviewRequestComment": {
-    "author": "example-maintainer",
-    "authorType": "User",
-    "appSlug": null,
-    "body": "@codex review",
-    "createdAt": "2026-08-31T10:00:05Z",
-    "url": "https://github.com/example/project/pull/42#issuecomment-5",
-    "reactions": [
-      {
-        "author": "chatgpt-codex-connector[bot]",
-        "content": "+1",
-        "createdAt": "2026-08-31T10:03:00Z"
-      }
-    ]
+    "url": "https://github.com/example/project/pull/42#issuecomment-2"
   },
   "terminalReview": {
     "author": "chatgpt-codex-connector",
@@ -144,5 +75,59 @@
         "url": "https://github.com/example/project/pull/42#discussion_r2"
       }
     ]
+  },
+  "summaryRunning": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | 🔄 **Running** since <relative-time datetime=\"2026-08-31T10:00:10.123456Z\">2026-08-31T10:00:10.123456Z</relative-time> | `aaaaaaa` | PR opened |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "summaryCompleted": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-08-31T10:02:04.123456Z\">2026-08-31T10:02:04.123456Z</relative-time> | `aaaaaaa` | PR opened |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "summaryFollowUpRunning": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | 🔄 **Running** since <relative-time datetime=\"2026-08-31T10:02:40.123456Z\">2026-08-31T10:02:40.123456Z</relative-time> | `aaaaaaa` | Manual request |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "summaryOldCommitRunning": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | 🔄 **Running** since <relative-time datetime=\"2026-08-31T09:59:50.123456Z\">2026-08-31T09:59:50.123456Z</relative-time> | `bbbbbbb` | New commits |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "summarySecurityRunning": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-08-31T10:02:04.123456Z\">2026-08-31T10:02:04.123456Z</relative-time> | `aaaaaaa` | PR opened |\n| 🔒 **Security Review** | 🔄 **Running** since <relative-time datetime=\"2026-08-31T10:02:30.123456Z\">2026-08-31T10:02:30.123456Z</relative-time> | `aaaaaaa` | PR opened |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "summaryUnknownStatus": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ⚠️ **Failed** <relative-time datetime=\"2026-08-31T10:02:40.123456Z\">2026-08-31T10:02:40.123456Z</relative-time> | `aaaaaaa` | Manual request |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
+    "createdAt": "2026-08-31T10:00:12Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "reviewRequest": {
+    "author": "octocat",
+    "body": "@codex review",
+    "createdAt": "2026-08-31T10:05:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-20"
+  },
+  "securityReviewRequest": {
+    "author": "octocat",
+    "body": "@codex security review",
+    "createdAt": "2026-08-31T10:05:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-21"
+  },
+  "errorComment": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "Codex Review: Something went wrong. Try again later by commenting “@codex review”.\n\n```\nUnknown error\n```",
+    "createdAt": "2026-08-31T10:05:30Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-22"
   }
 }

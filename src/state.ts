@@ -3,7 +3,11 @@ import type {
   IssueCommentSignal,
   ReviewEvaluation,
   ReviewSnapshot,
+  SummaryRow,
 } from "./types.js";
+
+const SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->";
+const REVIEW_REQUEST = /@codex[ \t]+review\b/iu;
 
 export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommentSignal {
   const body = comment.body.trim().replace(/\r\n?/g, "\n");
@@ -14,19 +18,6 @@ export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommen
     codexHeadingOffset >= 0 &&
     codexHeadingOffset <= 96 &&
     !/[A-Za-z0-9]/u.test(headingPrefix.replace(/^#{1,6}[ \t]+/u, ""));
-
-  if (headingLooksOfficial) {
-    const heading = firstLine.slice(codexHeadingOffset);
-    const progressPattern =
-      /^Codex Review[ \t]+(?:still[ \t]+)?in[ \t]+progress(?:\.|:[ \t]*[^\n]{1,160})?$/iu;
-    if (body === firstLine && progressPattern.test(heading)) {
-      return {
-        kind: "liveness",
-        name: "progress-comment",
-        commitRef: null,
-      };
-    }
-  }
 
   const cleanLead = "Codex Review: Didn't find any major issues.";
   const commitMarkers = [
@@ -52,6 +43,43 @@ export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommen
   };
 }
 
+/**
+ * Parses the connector's in-place "Codex Review Summary" comment. Returns null
+ * when the comment lacks the summary marker. A row whose status is neither
+ * Running nor Completed is reported as `unknown` so callers can fail closed.
+ */
+export function parseCodexReviewSummary(comment: IssueCommentRecord): SummaryRow[] | null {
+  const lines = comment.body.replace(/\r\n?/g, "\n").split("\n");
+  if (!lines.some((line) => line.trim() === SUMMARY_MARKER)) {
+    return null;
+  }
+  const rows: SummaryRow[] = [];
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("|")) {
+      continue;
+    }
+    const cells = trimmed
+      .replace(/^\||\|$/gu, "")
+      .split("|")
+      .map((cell) => cell.trim());
+    const label = cells[0] ?? "";
+    const status = cells[1] ?? "";
+    if (cells.length < 4 || label === "Review" || /^:?-+:?$/u.test(label)) {
+      continue;
+    }
+    const statusWord = /\*\*(Running|Completed)\*\*/iu.exec(status)?.[1]?.toLowerCase();
+    rows.push({
+      review: label.replace(/\*\*/gu, "").replace(/^[^\p{L}\p{N}]+/u, "").trim(),
+      status: statusWord === "running" || statusWord === "completed" ? statusWord : "unknown",
+      at: /datetime="([^"]+)"/u.exec(status)?.[1] ?? null,
+      commitRef: /`([0-9a-f]{7,40})`/iu.exec(cells[2] ?? "")?.[1]?.toLowerCase() ?? null,
+      trigger: cells[3] ?? "",
+    });
+  }
+  return rows;
+}
+
 export function evaluateReviewState(
   snapshot: ReviewSnapshot,
   botLogins: ReadonlySet<string>,
@@ -66,10 +94,6 @@ export function evaluateReviewState(
   const headCommittedAt = snapshot.headCommittedAt
     ? Date.parse(snapshot.headCommittedAt)
     : Number.NEGATIVE_INFINITY;
-  const observedReactions = [
-    ...snapshot.reactions,
-    ...snapshot.issueComments.flatMap((comment) => comment.reactions),
-  ];
   const terminalStates = new Set(["COMMENTED", "APPROVED", "CHANGES_REQUESTED"]);
   const botTerminalReviews = snapshot.reviews.filter(
     (review) => isBot(review.author) && terminalStates.has(review.state.toUpperCase()),
@@ -113,7 +137,7 @@ export function evaluateReviewState(
     ? headCleanSignal
     : latestByDate(botCleanSignals, ({ comment }) => comment.createdAt);
 
-  const botCleanReactions = observedReactions.filter(
+  const botCleanReactions = snapshot.reactions.filter(
     (reaction) =>
       isBot(reaction.author) && new Set(["+1", "thumbs_up"]).has(reaction.content.toLowerCase()),
   );
@@ -128,30 +152,25 @@ export function evaluateReviewState(
     ? Boolean(headCleanSignal ?? headCleanReaction)
     : Boolean(terminalReview ?? cleanSignal ?? cleanReaction);
 
-  const progressComment = latestByDate(
-    snapshot.issueComments.filter((comment) => {
-      if (!isBot(comment.author) || parseCodexIssueComment(comment).kind !== "liveness") {
-        return false;
-      }
-      return isFresh(comment);
-    }),
-    (comment) => comment.createdAt,
+  // The summary keeps only the latest run per review kind, so a Code Review
+  // row on the current HEAD that has not completed is an in-flight review.
+  // Security Review rows are not gated on.
+  const summary = latestByDate(
+    snapshot.issueComments
+      .filter((comment) => isBot(comment.author))
+      .map((comment) => ({ comment, rows: parseCodexReviewSummary(comment) }))
+      .filter((entry): entry is { comment: IssueCommentRecord; rows: SummaryRow[] } => entry.rows !== null),
+    ({ comment }) => comment.createdAt,
   );
-  const eyesReaction = latestByDate(
-    observedReactions.filter((reaction) => {
-      if (!isBot(reaction.author) || reaction.content.toLowerCase() !== "eyes") {
-        return false;
-      }
-      return isFresh(reaction);
-    }),
-    (reaction) => reaction.createdAt,
+  const headCodeReviewRow = summary?.rows.find(
+    (row) =>
+      row.review.toLowerCase() === "code review" &&
+      row.commitRef !== null &&
+      currentHead.startsWith(row.commitRef),
   );
-  const currentHeadLiveness = Boolean(progressComment ?? eyesReaction);
+  const headRowRunning =
+    headCodeReviewRow !== undefined && headCodeReviewRow.status !== "completed";
 
-  // A review that started after the latest completed verdict keeps the job
-  // waiting: it was paid for (auto-review on push, or an explicit @codex
-  // review request), so its result must land before the gate opens. Liveness
-  // predating the latest verdict is a leftover of that completed review.
   const latestTerminalAt = Math.max(
     Number.NEGATIVE_INFINITY,
     ...botTerminalReviews.map((review) =>
@@ -164,10 +183,27 @@ export function evaluateReviewState(
       reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY,
     ),
   );
-  const newReviewStarted = [progressComment, eyesReaction].some((record) => {
-    const createdAt = record?.createdAt;
-    return createdAt != null && Date.parse(createdAt) > latestTerminalAt;
-  });
+  // The summary row switches to Running 10–20 s after an `@codex review`
+  // request, so a request with no later Codex activity is still pending; a
+  // stale verdict must not pass in that gap.
+  const timeOf = (date: string | null) => (date ? Date.parse(date) : Number.NEGATIVE_INFINITY);
+  const latestRequestAt = Math.max(
+    Number.NEGATIVE_INFINITY,
+    ...snapshot.issueComments
+      .filter((comment) => !isBot(comment.author) && REVIEW_REQUEST.test(comment.body))
+      .map((comment) => timeOf(comment.createdAt)),
+  );
+  const latestCodexActivityAt = Math.max(
+    latestTerminalAt,
+    ...(summary?.rows ?? [])
+      .filter((row) => row.review.toLowerCase() === "code review")
+      .map((row) => timeOf(row.at)),
+    ...snapshot.issueComments
+      .filter((comment) => isBot(comment.author))
+      .map((comment) => timeOf(comment.createdAt)),
+  );
+  const pendingRequest = latestRequestAt > latestCodexActivityAt;
+  const currentHeadLiveness = headRowRunning || pendingRequest;
 
   const unresolvedThreads = snapshot.threads.filter(
     (thread) =>
@@ -180,19 +216,17 @@ export function evaluateReviewState(
       unresolvedThreads,
       // A newer in-flight review may add findings, so resolving alone is not
       // known to be sufficient yet.
-      currentHeadTerminal: currentHeadTerminal && !newReviewStarted,
+      currentHeadTerminal: currentHeadTerminal && !currentHeadLiveness,
       currentHeadLiveness,
       terminalAt: null,
     };
   }
-  if (newReviewStarted) {
-    const latestLiveness = latestByDate(
-      [progressComment, eyesReaction].filter((record) => record != null),
-      (record) => record.createdAt,
-    );
+  // An in-flight review was paid for (auto-review on push, or an explicit
+  // @codex review request), so its result must land before the gate opens.
+  if (currentHeadLiveness) {
     return {
       phase: "reviewing",
-      signal: latestLiveness === progressComment ? "progress-comment" : "eyes",
+      signal: headRowRunning ? `summary:${headCodeReviewRow?.status}` : "review-requested",
       unresolvedThreads,
       currentHeadTerminal: false,
       currentHeadLiveness: true,
