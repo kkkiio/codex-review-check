@@ -38,7 +38,7 @@ That project is a much stronger attestation and orchestration gate. Codex Review
 
 OpenAI's [Codex code review announcement](https://openai.com/index/introducing-upgrades-to-codex/) documents automatic pull request review and explicit review requests through `@codex review`. The product documentation at [Codex code review in GitHub](https://learn.chatgpt.com/codex/third-party/github) (see also the [code-review use case](https://learn.chatgpt.com/use-cases/github-code-reviews)) additionally documents the 👀 acknowledgment reaction, automatic review triggers, a stated P0/P1 finding focus, and `AGENTS.md` review rules. Neither defines the exact GitHub reaction, comment, or review payload grammar as an API contract.
 
-The current observed details—connector login, 👀 liveness, progress comment, terminal review, clean comment, and reviewed-commit marker—come from the two upstream implementations and their fixtures/design notes. They are isolated in [`CODEX_GITHUB_SIGNALS.md`](CODEX_GITHUB_SIGNALS.md) so later provider drift can be reviewed deliberately.
+The current observed details—connector login, 👀 liveness, progress comment, terminal review, clean comment, and reviewed-commit marker—come from the two upstream implementations and their fixtures/design notes. They are isolated in [`CODEX_GITHUB_SIGNALS.md`](CODEX_GITHUB_SIGNALS.md) so later provider drift can be reviewed deliberately. The review summary comment, which replaced the progress comment and 👀 as the liveness signal read here in October 2026, was observed directly on live pull requests.
 
 ## Decision differences
 

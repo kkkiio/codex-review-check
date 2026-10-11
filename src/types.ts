@@ -16,12 +16,9 @@ export interface ReactionRecord {
 
 export interface IssueCommentRecord {
   author: string;
-  authorType: string | null;
-  appSlug: string | null;
   body: string;
   createdAt: string | null;
   url: string | null;
-  reactions: ReactionRecord[];
 }
 
 export interface ThreadCommentRecord {
@@ -54,8 +51,18 @@ export interface ReviewSnapshot {
 
 export type IssueCommentSignal =
   | { kind: "terminal"; name: "clean-comment"; commitRef: string }
-  | { kind: "liveness"; name: "progress-comment"; commitRef: null }
   | { kind: "none"; name: "none"; commitRef: null };
+
+export interface SummaryRow {
+  /** Review label with emoji and emphasis stripped, e.g. `Code Review`. */
+  review: string;
+  status: "running" | "completed" | "unknown";
+  /** Start time while running, completion time once completed. */
+  at: string | null;
+  /** Lowercase abbreviated commit, or null when the cell has none. */
+  commitRef: string | null;
+  trigger: string;
+}
 
 export interface ReviewEvaluation {
   phase: "blocked" | "terminal" | "awaiting-lgtm" | "reviewing" | "missing";
@@ -67,7 +74,7 @@ export interface ReviewEvaluation {
    * in lenient mode, or a current-HEAD LGTM in strict mode.
    */
   currentHeadTerminal: boolean;
-  /** True when a fresh 👀 or progress comment shows a review of the current HEAD is running. */
+  /** True when the summary's Code Review row shows a review of the current HEAD is running. */
   currentHeadLiveness: boolean;
   /** Epoch milliseconds of the selected terminal artifact; null outside the terminal phase. */
   terminalAt: number | null;

@@ -9,7 +9,7 @@ Codex review did not produce a terminal current-HEAD signal before timeout. Re-r
 
 | Pull request | HEAD | State | Signal |
 | --- | --- | --- | --- |
-| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | progress-comment |
+| [owner/repo#42](https://github.com/owner/repo/pull/42) | `821c759c9c3256e8a677800dbe8e4a88ae5e2ab0` | failure | summary:running |
 
 ## Review still in progress
 
