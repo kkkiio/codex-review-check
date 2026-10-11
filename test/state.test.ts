@@ -23,6 +23,9 @@ interface Fixtures {
   summaryOldCommitRunning: IssueCommentRecord;
   summarySecurityRunning: IssueCommentRecord;
   summaryUnknownStatus: IssueCommentRecord;
+  reviewRequest: IssueCommentRecord;
+  securityReviewRequest: IssueCommentRecord;
+  errorComment: IssueCommentRecord;
   terminalReview: ReviewRecord;
   oldReview: ReviewRecord;
   unresolvedThread: ReviewThreadRecord;
@@ -353,4 +356,55 @@ test("blocked results preserve current-HEAD liveness", () => {
   const noReview = evaluate({ ...fixtures.base, threads: [fixtures.unresolvedThread] });
   assert.equal(noReview.phase, "blocked");
   assert.equal(noReview.currentHeadLiveness, false);
+});
+
+test("a review request waits until Codex shows any activity after it", () => {
+  const pending = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    issueComments: [fixtures.summaryCompleted, fixtures.reviewRequest],
+  });
+  assert.equal(pending.phase, "reviewing");
+  assert.equal(pending.signal, "review-requested");
+  assert.equal(pending.currentHeadLiveness, true);
+
+  const strictPending = evaluate(
+    {
+      ...fixtures.base,
+      reactions: [fixtures.cleanReaction],
+      issueComments: [fixtures.reviewRequest],
+    },
+    true,
+  );
+  assert.equal(strictPending.phase, "reviewing");
+
+  const pickedUp = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.terminalReview],
+    issueComments: [fixtures.summaryCompleted, { ...fixtures.reviewRequest, createdAt: "2026-08-31T10:01:30Z" }],
+  });
+  assert.equal(pickedUp.phase, "terminal");
+
+  const errored = evaluate({
+    ...fixtures.base,
+    reviews: [fixtures.oldReview],
+    issueComments: [fixtures.reviewRequest, fixtures.errorComment],
+  });
+  assert.equal(errored.phase, "terminal");
+  assert.equal(errored.signal, "review:commented");
+});
+
+test("security review requests and connector text do not count as review requests", () => {
+  for (const comment of [
+    fixtures.securityReviewRequest,
+    { ...fixtures.reviewRequest, author: "chatgpt-codex-connector[bot]" },
+  ]) {
+    const evaluation = evaluate({
+      ...fixtures.base,
+      reviews: [fixtures.oldReview],
+      issueComments: [comment],
+    });
+    assert.equal(evaluation.phase, "terminal");
+    assert.equal(evaluation.currentHeadLiveness, false);
+  }
 });

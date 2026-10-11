@@ -111,5 +111,23 @@
     "body": "<!-- codex-pull-request-review-summary -->\n\n## Codex Review Summary\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ⚠️ **Failed** <relative-time datetime=\"2026-08-31T10:02:40.123456Z\">2026-08-31T10:02:40.123456Z</relative-time> | `aaaaaaa` | Manual request |\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\nCodex reviews this pull request when it is opened, marked ready, or updated, and when someone comments \"@codex review\".\n</details>",
     "createdAt": "2026-08-31T10:00:12Z",
     "url": "https://github.com/example/project/pull/42#issuecomment-7"
+  },
+  "reviewRequest": {
+    "author": "octocat",
+    "body": "@codex review",
+    "createdAt": "2026-08-31T10:05:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-20"
+  },
+  "securityReviewRequest": {
+    "author": "octocat",
+    "body": "@codex security review",
+    "createdAt": "2026-08-31T10:05:00Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-21"
+  },
+  "errorComment": {
+    "author": "chatgpt-codex-connector[bot]",
+    "body": "Codex Review: Something went wrong. Try again later by commenting “@codex review”.\n\n```\nUnknown error\n```",
+    "createdAt": "2026-08-31T10:05:30Z",
+    "url": "https://github.com/example/project/pull/42#issuecomment-22"
   }
 }

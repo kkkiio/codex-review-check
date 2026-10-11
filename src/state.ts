@@ -7,6 +7,7 @@ import type {
 } from "./types.js";
 
 const SUMMARY_MARKER = "<!-- codex-pull-request-review-summary -->";
+const REVIEW_REQUEST = /@codex[ \t]+review\b/iu;
 
 export function parseCodexIssueComment(comment: IssueCommentRecord): IssueCommentSignal {
   const body = comment.body.trim().replace(/\r\n?/g, "\n");
@@ -167,7 +168,7 @@ export function evaluateReviewState(
       row.commitRef !== null &&
       currentHead.startsWith(row.commitRef),
   );
-  const currentHeadLiveness =
+  const headRowRunning =
     headCodeReviewRow !== undefined && headCodeReviewRow.status !== "completed";
 
   const latestTerminalAt = Math.max(
@@ -182,6 +183,28 @@ export function evaluateReviewState(
       reaction.createdAt ? Date.parse(reaction.createdAt) : Number.NEGATIVE_INFINITY,
     ),
   );
+  // The summary row switches to Running 10–20 s after an `@codex review`
+  // request, so a request with no later Codex activity is still pending; a
+  // stale verdict must not pass in that gap.
+  const timeOf = (date: string | null) => (date ? Date.parse(date) : Number.NEGATIVE_INFINITY);
+  const latestRequestAt = Math.max(
+    Number.NEGATIVE_INFINITY,
+    ...snapshot.issueComments
+      .filter((comment) => !isBot(comment.author) && REVIEW_REQUEST.test(comment.body))
+      .map((comment) => timeOf(comment.createdAt)),
+  );
+  const latestCodexActivityAt = Math.max(
+    latestTerminalAt,
+    ...(summary?.rows ?? [])
+      .filter((row) => row.review.toLowerCase() === "code review")
+      .map((row) => timeOf(row.at)),
+    ...snapshot.issueComments
+      .filter((comment) => isBot(comment.author))
+      .map((comment) => timeOf(comment.createdAt)),
+  );
+  const pendingRequest = latestRequestAt > latestCodexActivityAt;
+  const currentHeadLiveness = headRowRunning || pendingRequest;
+
   const unresolvedThreads = snapshot.threads.filter(
     (thread) =>
       !thread.isResolved && thread.comments.some((comment) => isBot(comment.author)),
@@ -203,7 +226,7 @@ export function evaluateReviewState(
   if (currentHeadLiveness) {
     return {
       phase: "reviewing",
-      signal: `summary:${headCodeReviewRow?.status ?? "unknown"}`,
+      signal: headRowRunning ? `summary:${headCodeReviewRow?.status}` : "review-requested",
       unresolvedThreads,
       currentHeadTerminal: false,
       currentHeadLiveness: true,
