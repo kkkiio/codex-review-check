@@ -1,5 +1,5 @@
 === annotation (core.setFailed — the line agents read via gh run view --log-failed) ===
-2 unresolved Codex review thread(s) are blocking (listed above). The current HEAD has no Codex review yet. Resolve each thread: fix the finding, or reply with your reasoning on the thread, then resolve. Silent resolves are not auditable. Then request a fresh review: gh pr comment 42 --body '@codex review' — then re-run: gh run rerun 33499862152 --failed. If you already resolved the threads after this run started, start with the review request.
+2 unresolved Codex review thread(s) are blocking (listed above). Codex has not reviewed the current HEAD yet. Resolve each thread: fix the finding, or reply with your reasoning on the thread, then resolve. Silent resolves are not auditable. Then run these back to back, without waiting in between: gh pr comment 42 --body '@codex review' && gh run rerun 33499862152 --failed && gh pr checks 42 --watch. The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong. If you already resolved the threads after this run started, skip straight to these commands.
 
 === job log lines (core.info) ===
 Blocking Codex review thread: https://github.com/owner/repo/pull/42#discussion_r1
@@ -19,14 +19,12 @@ Resolve each thread: fix the finding, or reply with your reasoning on the thread
 - [docs/adr/0012-glyph-width.md:18](https://github.com/owner/repo/pull/42#discussion_r1)
 - src/widget.ts (outdated)
 
-The current HEAD also has no Codex review yet. After the threads are handled, request a fresh review:
+Codex has not reviewed the current HEAD yet. After the threads are handled, run these back to back, without waiting in between:
 
 ```shell
 gh pr comment 42 --body '@codex review'
-```
-
-Then re-run the failed check:
-
-```shell
 gh run rerun 33499862152 --failed
+gh pr checks 42 --watch
 ```
+
+The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong.

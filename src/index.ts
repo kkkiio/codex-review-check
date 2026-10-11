@@ -3,6 +3,7 @@ import * as github from "@actions/github";
 import { loadReviewSnapshot } from "./github.js";
 import {
   failureOutput,
+  type MessageOptions,
   reviewRequestCommand,
   suggestsReviewRequest,
   summaryMarkdown,
@@ -28,29 +29,20 @@ async function publishResult(
   evaluation: ReviewEvaluation,
   state: "success" | "failure",
   reason: string,
-  reviewHintPolicy: ReviewHintPolicy,
-  requireLgtm: boolean,
+  messageOptions: MessageOptions,
 ): Promise<void> {
   core.setOutput("state", state);
   core.setOutput("reason", reason);
   core.setOutput("head-sha", snapshot.headSha);
   core.setOutput("review-signal", evaluation.signal);
   core.setOutput("unresolved-count", evaluation.unresolvedThreads.length.toString());
-  const suggestReviewRequest = suggestsReviewRequest(reason, evaluation, reviewHintPolicy);
+  const suggestReviewRequest = suggestsReviewRequest(reason, evaluation, messageOptions.reviewHint);
   core.setOutput(
     "review-hint",
     suggestReviewRequest ? reviewRequestCommand(snapshot.pullRequest) : "",
   );
   core.summary.addRaw(
-    summaryMarkdown(
-      snapshot,
-      evaluation,
-      state,
-      reason,
-      process.env.GITHUB_RUN_ID,
-      reviewHintPolicy,
-      requireLgtm,
-    ),
+    summaryMarkdown(snapshot, evaluation, state, reason, messageOptions),
   );
   await core.summary.write();
 }
@@ -113,6 +105,12 @@ async function run(): Promise<void> {
     throw new Error("codex-bot-logins must contain at least one login.");
   }
 
+  const messageOptions: MessageOptions = {
+    runId: process.env.GITHUB_RUN_ID,
+    reviewHint: config.reviewHintPolicy,
+    requireLgtm: config.requireLgtm,
+    reviewTimeoutSeconds: config.reviewTimeoutSeconds,
+  };
   let headStartedAt = Date.now();
   let observedHeadSha = "";
   let livenessSeen = false;
@@ -145,9 +143,7 @@ async function run(): Promise<void> {
         "unresolved-threads",
         snapshot,
         evaluation,
-        process.env.GITHUB_RUN_ID,
-        config.reviewHintPolicy,
-        config.requireLgtm,
+        messageOptions,
       );
       for (const line of output.logLines) {
         core.info(line);
@@ -157,8 +153,7 @@ async function run(): Promise<void> {
         evaluation,
         "failure",
         "unresolved-threads",
-        config.reviewHintPolicy,
-        config.requireLgtm,
+        messageOptions,
       );
       core.setFailed(output.annotation);
       return;
@@ -182,8 +177,7 @@ async function run(): Promise<void> {
           evaluation,
           "success",
           "ready",
-          config.reviewHintPolicy,
-          config.requireLgtm,
+          messageOptions,
         );
         return;
       }
@@ -214,17 +208,14 @@ async function run(): Promise<void> {
           evaluation,
           "failure",
           "lgtm-missing",
-          config.reviewHintPolicy,
-          config.requireLgtm,
+          messageOptions,
         );
         core.setFailed(
           failureOutput(
             "lgtm-missing",
             snapshot,
             evaluation,
-            process.env.GITHUB_RUN_ID,
-            config.reviewHintPolicy,
-            config.requireLgtm,
+            messageOptions,
           ).annotation,
         );
         return;
@@ -240,17 +231,14 @@ async function run(): Promise<void> {
         evaluation,
         "failure",
         "review-missing",
-        config.reviewHintPolicy,
-        config.requireLgtm,
+        messageOptions,
       );
       core.setFailed(
         failureOutput(
           "review-missing",
           snapshot,
           evaluation,
-          process.env.GITHUB_RUN_ID,
-          config.reviewHintPolicy,
-          config.requireLgtm,
+          messageOptions,
         ).annotation,
       );
       return;
@@ -265,17 +253,14 @@ async function run(): Promise<void> {
         evaluation,
         "failure",
         "review-timeout",
-        config.reviewHintPolicy,
-        config.requireLgtm,
+        messageOptions,
       );
       core.setFailed(
         failureOutput(
           "review-timeout",
           snapshot,
           evaluation,
-          process.env.GITHUB_RUN_ID,
-          config.reviewHintPolicy,
-          config.requireLgtm,
+          messageOptions,
         ).annotation,
       );
       return;
