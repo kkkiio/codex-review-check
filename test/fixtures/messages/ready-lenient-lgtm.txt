@@ -1,4 +1,4 @@
-# Codex Review
+# Codex Review Gate
 
 | Pull request | HEAD | State | Signal |
 | --- | --- | --- | --- |

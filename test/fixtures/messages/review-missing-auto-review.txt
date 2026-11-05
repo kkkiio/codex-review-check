@@ -5,7 +5,7 @@ No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0
 (none)
 
 === job summary (web UI only) ===
-# Codex Review
+# Codex Review Gate
 
 | Pull request | HEAD | State | Signal |
 | --- | --- | --- | --- |

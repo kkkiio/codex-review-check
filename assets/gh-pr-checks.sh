@@ -1,5 +1,5 @@
 #!/bin/sh
-# Captures REAL gh output for the README screenshot. Requires a failed Codex Review
+# Captures REAL gh output for the README screenshot. Requires a failed Codex Review Gate
 # run to exist; override PR/RUN to target another one. Regenerate with:
 #   freeze --execute "sh assets/gh-pr-checks.sh" --window --theme github \
 #     --font.family "Menlo" --font.size 16 --line-height 1.6 --padding 36 \

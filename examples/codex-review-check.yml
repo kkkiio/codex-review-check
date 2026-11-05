@@ -16,12 +16,12 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: codex-review-${{ github.repository }}-${{ inputs['pull-request'] || github.event.pull_request.number }}
+  group: codex-review-gate-${{ github.repository }}-${{ inputs['pull-request'] || github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  codex-review:
-    name: Codex Review
+  codex-review-gate:
+    name: Codex Review Gate
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:

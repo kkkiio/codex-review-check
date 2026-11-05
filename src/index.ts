@@ -133,7 +133,7 @@ async function run(): Promise<void> {
     livenessSeen ||= evaluation.phase === "reviewing";
     if (evaluation.phase !== lastPhase) {
       core.info(
-        `Codex Review state for ${snapshot.repository}#${snapshot.pullRequest} at ${snapshot.headSha}: ${evaluation.phase} (${evaluation.signal}).`,
+        `Codex Review Gate state for ${snapshot.repository}#${snapshot.pullRequest} at ${snapshot.headSha}: ${evaluation.phase} (${evaluation.signal}).`,
       );
       lastPhase = evaluation.phase;
     }

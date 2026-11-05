@@ -6,7 +6,7 @@ Blocking Codex review thread: https://github.com/owner/repo/pull/42#discussion_r
 Blocking Codex review thread: src/widget.ts (outdated)
 
 === job summary (web UI only) ===
-# Codex Review
+# Codex Review Gate
 
 | Pull request | HEAD | State | Signal |
 | --- | --- | --- | --- |
