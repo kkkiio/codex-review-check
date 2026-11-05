@@ -44,7 +44,7 @@ The current observed details—connector login, 👀 liveness, progress comment,
 
 | Concern | Heúrema ready | JoeyTeng gate | Codex Review Check |
 | --- | --- | --- | --- |
-| Required surface | Custom commit status | Custom commit status | Actions job `Codex Review` |
+| Required surface | Custom commit status | Custom commit status | Actions job `Codex Review Gate` |
 | Missing current-head signal | Pending, then configured timeout/scheduled healing | Marker orchestration and pending/retry | Short grace, then failure with review hint |
 | Sends `@codex review` | No | Yes, controlled marker | No |
 | 👀 | Not primary pass evidence | Liveness only | Liveness only |

@@ -1,25 +1,25 @@
 # Codex Review Check
 
 <p align="center">
-  <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review failure, then gh run view --log-failed printing the next steps" width="930">
+  <img src="assets/gh-pr-checks.png" alt="gh pr checks showing a Codex Review Gate failure, then gh run view --log-failed printing the next steps" width="930">
 </p>
 
 Codex Review Check is a read-only, credit-aware GitHub Action that guides agents through the Codex review loop: a completed review holds the quality floor by default, and `require-lgtm: true` raises the bar to a current-HEAD Codex LGTM.
 
 ## Installation
 
-1. Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`. The example pins the Action to a reviewed full commit SHA and grants only read permissions.
+1. Copy the ready-to-use [`examples/codex-review-check.yml`](examples/codex-review-check.yml) into the consuming repository as `.github/workflows/codex-review-check.yml`.
 2. Enable Codex code review for the repository with the **On pull request** trigger, so each pull request receives an initial review.
 
 ## Usage
 
-Open or update a pull request, then watch the normal check interface:
+Once installed, your agent needs no special instructions beyond checking PR status as usual:
 
 ```shell
 gh pr checks --watch
 ```
 
-When `gh pr checks` reports a failure, the failure log line gives the agent one concrete next action and keeps review-credit decisions explicit:
+When the gate fails, the agent inspects the failed run and gets the exact command chain to run next:
 
 ```console
 $ gh run view --log-failed
@@ -27,9 +27,7 @@ $ gh run view --log-failed
 ##[error]No Codex review signal for current HEAD 821c759c9c3256e8a677800dbe8e4a88ae5e2ab0. Request one and run these back to back, without waiting in between: gh pr comment 42 --body '@codex review' && gh run rerun 33499862152 --failed && gh pr checks 42 --watch. The re-run check itself waits up to 30 min for the Codex review to finish, then passes or reports the next action. Start it right away and wait on the check; read Codex reviews or comments directly only if the check result looks wrong.
 ```
 
-The job summary mirrors the same guidance in the web UI for human debugging.
-
-The initial review only covers the first HEAD. When a later push needs another review, the failure prints the explicit request command — `gh pr comment <PR> --body '@codex review'` — for the agent to run; the Action never spends Codex credits itself. By default a completed review passes once its threads are resolved; set `require-lgtm: true` to require a current-HEAD LGTM.
+The Action never spends Codex credits itself — when a later push needs a fresh review, the failure output tells the agent to request one with `gh pr comment <PR> --body '@codex review'` before re-running the gate.
 
 The check follows this state model — the loop over time:
 

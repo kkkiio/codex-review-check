@@ -61,7 +61,7 @@ export function nextStepCommands(
 ): string[] {
   return [
     ...(requestReview ? [reviewRequestCommand(pullRequest)] : []),
-    runId ? `gh run rerun ${runId} --failed` : "re-run the failed Codex Review job from GitHub Actions",
+    runId ? `gh run rerun ${runId} --failed` : "re-run the failed Codex Review Gate job from GitHub Actions",
     `gh pr checks ${pullRequest} --watch`,
   ];
 }
@@ -191,7 +191,7 @@ export function summaryMarkdown(
   options: MessageOptions,
 ): string {
   const lines = [
-    "# Codex Review",
+    "# Codex Review Gate",
     "",
     "| Pull request | HEAD | State | Signal |",
     "| --- | --- | --- | --- |",
